@@ -15,7 +15,6 @@ const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 const Login = () => {
   const [showPassword, setShowPassword] = useState(true);
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
@@ -25,10 +24,6 @@ const Login = () => {
     console.log("Sign In");
 
     setError("");
-    if (!name) {
-      setError("Please enter name");
-      return;
-    }
 
     if (!email) {
       setError("Please enter email");
@@ -59,7 +54,7 @@ const Login = () => {
 
       if (response.success && response.idToken) {
         localStorage.setItem("idToken", response.idToken);
-        router.push("/admin");
+        router.push("/admin/notes-management");
       } else {
         setError(response.message || "Login failed. Please try again.");
       }
@@ -100,23 +95,6 @@ const Login = () => {
             👋 Welcome To <span className="text-[#7DB4AB]">KSHIPRA</span>
           </h1>
           <div className="flex flex-col w-[350px] items-center justify-center gap-4">
-            <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Image
-                  src="/images/user.svg"
-                  width={20}
-                  height={20}
-                  alt="User"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Name"
-                className="border border-gray-300 rounded-xl p-3 pl-12 w-full text-black"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
             <div className="relative w-full">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Image

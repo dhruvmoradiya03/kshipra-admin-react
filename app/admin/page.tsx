@@ -1,3 +1,3 @@
-import manageNotes from "@/components/manageNotes";
+import manageNotes from "@/components/notes/manageNotes";
 
 export default manageNotes;

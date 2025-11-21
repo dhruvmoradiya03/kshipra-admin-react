@@ -1,0 +1,49 @@
+/* Keep header clean */
+.notes-table .ant-table-thead > tr > th {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-weight: 700;
+    font-size: 16px;
+    font-family: 'Work Sans', sans-serif;
+    color: #1E4640;
+    padding: 10px 12px !important;
+  }
+  
+  /* Remove header separator */
+  .notes-table .ant-table-thead > tr > th::before {
+    display: none !important;
+  }
+  
+  /* Add spacing between each body row */
+  .notes-table .ant-table-container table {
+    border-collapse: separate !important;
+    border-spacing: 0 10px !important; /* row gap */
+  }
+  
+  /* Body row styles */
+  .notes-table-row {
+    background: #fff;
+    box-shadow: 0px 0px 4px 0px #00000040; /* Your exact shadow */
+    transition: 0.2s ease;
+  }
+  
+  /* Reduce padding inside cells */
+  .notes-table .ant-table-tbody > tr > td {
+    padding: 8px 12px !important; /* reduced padding */
+    border: none !important;
+  }
+
+  /* Center align all header cells */
+.notes-table .ant-table-thead > tr > th {
+    text-align: center !important;
+  }
+  
+  /* Center align all body cells */
+  .notes-table .ant-table-tbody > tr > td {
+    text-align: center !important;
+  }
+  
+  
+  
+  

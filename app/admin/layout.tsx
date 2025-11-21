@@ -10,7 +10,7 @@ export default function AdminLayout({
   return (
     <div className="flex">
       <Sidebar />
-      <main className="w-[80%] p-6">{children}</main>
+      <main className="w-[80%] border">{children}</main>
     </div>
   );
 }
