@@ -10,66 +10,24 @@ import NotesList from "./NotesList";
 import AddNoteModal from "./AddNoteModal";
 import EditNoteModal from "./EditNoteModal";
 import DeleteNoteModal from "./DeleteNoteModal";
+import {
+  addNote,
+  deleteNote,
+  getNotes,
+  getNotesBySubjectId,
+  getNotesByTopicId,
+  updateNote,
+} from "@/service/api/notes.api";
+import { getSubjects, getTopics } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
-const subject = [
-  { name: "Anatomy", id: 1 },
-  { name: "Pharmacy", id: 2 },
-  { name: "Botany", id: 3 },
-  { name: "Zoology", id: 4 },
-];
-const topic = [
-  { id: 1, name: "test1", subject: 1 },
-  { id: 2, name: "test5", subject: 1 },
-  { id: 3, name: "test6", subject: 1 },
-
-  { id: 4, name: "test2", subject: 2 },
-  { id: 5, name: "test7", subject: 2 },
-  { id: 6, name: "test8", subject: 2 },
-
-  { id: 7, name: "test3", subject: 3 },
-  { id: 8, name: "test9", subject: 3 },
-  { id: 9, name: "test10", subject: 3 },
-
-  { id: 10, name: "test4", subject: 4 },
-  { id: 11, name: "test11", subject: 4 },
-  { id: 12, name: "test12", subject: 4 },
-];
-
-const notes = [
-  {
-    subject: 1,
-    topic: 1,
-    title: "test1",
-    file: "test1.pdf",
-  },
-  {
-    subject: 1,
-    topic: 2,
-    title: "test2",
-    file: "test2.pdf",
-  },
-  {
-    subject: 1,
-    topic: 3,
-    title: "test3",
-    file: "test3.pdf",
-  },
-  { subject: 2, topic: 4, title: "test4", file: "test4.pdf" },
-  { subject: 2, topic: 5, title: "test5", file: "test5.pdf" },
-  { subject: 2, topic: 6, title: "test6", file: "test6.pdf" },
-  { subject: 3, topic: 7, title: "test7", file: "test7.pdf" },
-  { subject: 3, topic: 8, title: "test8", file: "test8.pdf" },
-  { subject: 3, topic: 9, title: "test9", file: "test9.pdf" },
-  { subject: 4, topic: 10, title: "test10", file: "test10.pdf" },
-  { subject: 4, topic: 11, title: "test11", file: "test11.pdf" },
-  { subject: 4, topic: 12, title: "test12", file: "test12.pdf" },
-];
-
 const ManageNotes = () => {
-  const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
-  const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
+  const [subject, setSubject] = useState<any>([]);
+  const [topic, setTopic] = useState<any>([]);
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedTopic, setSelectedTopic] = useState<any>(null);
+
   const [noteList, setNoteList] = useState<any>([]);
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -79,73 +37,188 @@ const ManageNotes = () => {
 
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (selectedSubject && selectedTopic) {
-      const filteredNotes = notes.filter(
-        (note) =>
-          note.subject === selectedSubject && note.topic === selectedTopic
-      );
-      setNoteList(filteredNotes);
-    } else if (selectedSubject) {
-      const filteredNotes = notes.filter(
-        (note) => note.subject === selectedSubject
-      );
-      setNoteList(filteredNotes);
-    } else {
-      setNoteList([]);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+    lastVisible: null as any,
+  });
+
+  const fetchNotes = async (
+    page = pagination.current,
+    pageSize = pagination.pageSize,
+    lastVisible = pagination.lastVisible
+  ) => {
+    try {
+      setLoading(true);
+      console.log("Fetching notes...");
+
+      let result;
+
+      if (selectedSubject && selectedTopic) {
+        result = await getNotesByTopicId(
+          selectedTopic,
+          page,
+          pageSize,
+          lastVisible
+        );
+      } else if (selectedSubject) {
+        result = await getNotesBySubjectId(
+          selectedSubject,
+          page,
+          pageSize,
+          lastVisible
+        );
+      } else {
+        // Handle case when neither subject nor topic is selected
+        setNoteList([]);
+        return;
+      }
+
+      setNoteList(result.data);
+      setPagination((prev) => ({
+        ...prev,
+        total: result.total || result.data.length,
+        current: page,
+        pageSize,
+      }));
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [selectedSubject, selectedTopic]);
-
-  // Filter topics based on selected subject
-  const filteredTopics = selectedSubject
-    ? topic.filter((t) => t.subject === selectedSubject)
-    : [];
-
-  // Handle subject change
-  const handleSubjectChange = (subjectId: number) => {
-    setSelectedSubject(subjectId);
-    setSelectedTopic(null); // Reset topic when subject changes
   };
 
-  const handleAddNote = (values: any) => {
-    // In a real app, this would be an API call
+  const fetchSubjects = async () => {
+    try {
+      const subjects = await getSubjects();
+      setSubject(subjects);
+    } catch (error) {
+      console.error("Error fetching subjects:", error);
+    }
+  };
+
+  const fetchTopics = async () => {
+    try {
+      if (!selectedSubject) return;
+
+      console.log(selectedSubject);
+      const topics = await getTopics(selectedSubject);
+
+      console.log(topics, "this is topics");
+      setTopic(topics);
+    } catch (error) {
+      console.error("Error fetching topics:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubjects();
+    fetchTopics();
+  }, []);
+
+  useEffect(() => {
+    fetchTopics();
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [selectedSubject, selectedTopic, pagination.pageSize, pagination.current]);
+
+  const handlePageChange = (page: number, pageSize?: number) => {
+    setPagination((prev) => ({
+      ...prev,
+      current: page,
+      ...(pageSize && { pageSize }),
+    }));
+    fetchNotes(page, pageSize);
+  };
+
+  // Handle subject change
+  const handleSubjectChange = (subjectId: string) => {
+    setSelectedSubject(subjectId);
+    setSelectedTopic(null);
+    fetchTopics();
+  };
+
+  const handleAddNote = async (values: any) => {
+    console.log(values);
     const newNote = {
-      id: noteList.length + 1,
-      subject: selectedSubject!,
-      topic: selectedTopic!,
+      subjectId: values.subject,
+      topicId: values.topic,
       title: values.title,
-      description: values.description,
-      file: values.file[0]?.name || "new_note.pdf",
-      date: new Date().toISOString().split("T")[0],
+      file: values.pdfLink || null,
     };
+
+    try {
+      setLoading(true);
+      const result = await addNote(newNote);
+      console.log(result);
+    } catch (error) {
+      console.error("Error adding note:", error);
+    } finally {
+      setLoading(false);
+    }
 
     setNoteList([...noteList, newNote]);
     setIsAddModalVisible(false);
   };
 
-  const handleEditNote = (values: any) => {
+  const handleEditNote = async (values: any) => {
     // In a real app, this would be an API call
+    console.log(values);
+
+    const updatedNote = {
+      subjectId: values.subject,
+      topicId: values.topic,
+      title: values.title,
+      file: values.file,
+    };
+
     const updatedNotes = noteList.map((note: any) =>
-      note.id === currentNote?.id
-        ? { ...note, ...values, file: values.file[0]?.name || note.file }
+      note.document_id === currentNote?.document_id
+        ? { ...note, ...updatedNote, file: values.file }
         : note
     );
+
+    console.log(updatedNotes);
+
+    try {
+      setLoading(true);
+      const result = await updateNote(currentNote?.document_id, {
+        ...updatedNote,
+      });
+      console.log(result);
+    } catch (error) {
+      console.error("Error updating note:", error);
+    } finally {
+      setLoading(false);
+    }
 
     setNoteList(updatedNotes);
     setIsEditModalVisible(false);
     setCurrentNote(null);
   };
 
-  const handleDeleteNote = () => {
-    // In a real app, this would be an API call
-    // if (currentNote) {
-    //   const updatedNotes = noteList.filter(
-    //     (note: any) => note.id !== currentNote.id
-    //   );
-    //   setNoteList(updatedNotes);
-    //   setIsDeleteModalVisible(false);
-    //   setCurrentNote(null);
-    // }
+  const handleDeleteNote = async () => {
+    try {
+      setLoading(true);
+      const result = await deleteNote(currentNote?.document_id);
+      console.log(result);
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    } finally {
+      setLoading(false);
+    }
+
+    if (currentNote) {
+      const updatedNotes = noteList.filter(
+        (note: any) => note.id !== currentNote.id
+      );
+      setNoteList(updatedNotes);
+      setIsDeleteModalVisible(false);
+      setCurrentNote(null);
+    }
 
     setIsDeleteModalVisible(false);
   };
@@ -164,6 +237,8 @@ const ManageNotes = () => {
     // In a real app, this would open the note in a viewer
     console.log("Viewing note:", note);
   };
+
+  console.log(currentNote, "currentNote");
 
   return (
     <div className="flex flex-col px-6 py-4 bg-[#F5F6F7] h-full">
@@ -206,12 +281,12 @@ const ManageNotes = () => {
             <div className="flex gap-2">
               <Dropdown
                 menu={{
-                  items: subject.map((item) => ({
-                    key: item.id,
+                  items: subject.map((item: any) => ({
+                    key: item.document_id,
                     label: item.name,
                   })),
                   selectable: true,
-                  onSelect: (e) => handleSubjectChange(Number(e.key)),
+                  onSelect: (e) => handleSubjectChange(e.key),
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
@@ -219,8 +294,9 @@ const ManageNotes = () => {
                 <div className="flex items-center justify-between w-[200px] border border-gray-300 rounded-xl py-3 px-4 text-[#1E4640] bg-white cursor-pointer hover:border-[#1E4640] transition-colors">
                   <span>
                     {selectedSubject
-                      ? subject.find((s) => s.id === selectedSubject)?.name ||
-                        "Select Subject"
+                      ? subject.find(
+                          (s: any) => s.document_id === selectedSubject
+                        )?.name || "Select Subject"
                       : "Select Subject"}
                   </span>
                   <DownOutlined className="text-xs" />
@@ -228,13 +304,13 @@ const ManageNotes = () => {
               </Dropdown>
               <Dropdown
                 menu={{
-                  items: filteredTopics.map((item) => ({
-                    key: item.id.toString(),
+                  items: topic.map((item: any) => ({
+                    key: item.document_id,
                     label: item.name,
                   })),
                   selectable: true,
                   disabled: !selectedSubject,
-                  onSelect: (e) => setSelectedTopic(Number(e.key)),
+                  onSelect: (e) => setSelectedTopic(e.key),
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
@@ -250,7 +326,7 @@ const ManageNotes = () => {
                 >
                   <span>
                     {selectedTopic
-                      ? filteredTopics.find((t) => t.id === selectedTopic)
+                      ? topic.find((t: any) => t.document_id === selectedTopic)
                           ?.name || "Select Topic"
                       : "Select Topic"}
                   </span>
@@ -288,6 +364,10 @@ const ManageNotes = () => {
                 onDelete={handleDeleteClick}
                 onView={handleViewClick}
                 loading={loading}
+                total={pagination.total}
+                currentPage={pagination.current}
+                pageSize={pagination.pageSize}
+                onPageChange={handlePageChange}
               />
             </div>
           )}
@@ -298,10 +378,9 @@ const ManageNotes = () => {
       <AddNoteModal
         visible={isAddModalVisible}
         onCancel={() => setIsAddModalVisible(false)}
-        onSubmit={handleAddNote}
+        onSave={handleAddNote}
         loading={loading}
-        subject={subject} // Passing the subject constant defined at the top
-        topic={topic} // Passing the topic constant defined at the top
+        subject={subject}
       />
 
       {/* Edit Note Modal */}
@@ -312,10 +391,9 @@ const ManageNotes = () => {
             setIsEditModalVisible(false);
             setCurrentNote(null);
           }}
-          onSubmit={handleEditNote}
+          onSave={handleEditNote}
           note={currentNote}
           subjects={subject}
-          topics={topic}
           loading={loading}
         />
       )}

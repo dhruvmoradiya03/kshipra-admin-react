@@ -43,6 +43,15 @@
   .notes-table .ant-table-tbody > tr > td {
     text-align: center !important;
   }
+
+  /* Hide scrollbars for AntD table body */
+.hide-scrollbar .ant-table-body {
+  scrollbar-width: none; /* Firefox */
+}
+
+
+
+
   
   
   

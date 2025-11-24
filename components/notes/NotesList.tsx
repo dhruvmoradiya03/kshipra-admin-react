@@ -12,6 +12,10 @@ interface NotesListProps {
   onDelete: (note: Note) => void;
   onView: (note: Note) => void;
   loading?: boolean;
+  total?: number;
+  currentPage?: number;
+  pageSize?: number;
+  onPageChange?: (page: number, pageSize?: number) => void;
 }
 
 const NotesList: React.FC<NotesListProps> = ({
@@ -20,6 +24,10 @@ const NotesList: React.FC<NotesListProps> = ({
   onDelete,
   onView,
   loading,
+  total = 0,
+  currentPage = 1,
+  pageSize = 10,
+  onPageChange = () => {},
 }) => {
   const columns = [
     {
@@ -81,13 +89,23 @@ const NotesList: React.FC<NotesListProps> = ({
         rowKey="id"
         loading={loading}
         pagination={{
-          pageSize: 10,
+          current: currentPage,
+          pageSize: pageSize,
+          total: total,
           showSizeChanger: true,
           showTotal: (total) => `Total ${total} items`,
+          onChange: onPageChange,
+          onShowSizeChange: (current, size) => onPageChange?.(1, size),
         }}
-        className="notes-table"
+        className="notes-table hide-scrollbar"
         rowClassName={() => "notes-table-row"}
-        style={{ width: "100%" }}
+        style={{
+          width: "100%",
+        }}
+        scroll={{
+          y: "47vh",
+          x: "max-content",
+        }}
       />
     </div>
   );

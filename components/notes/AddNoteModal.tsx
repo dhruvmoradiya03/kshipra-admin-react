@@ -1,44 +1,61 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Input, Upload, Button, Form, Row, Col, Select } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { Subject, Topic } from "./types";
 import { Work_Sans } from "next/font/google";
+import { getTopics } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
 interface AddNoteModalProps {
   visible: boolean;
   onCancel: () => void;
-  onSubmit: (values: any) => void;
+  onSave: (values: any) => void;
   loading?: boolean;
   subject: Subject[];
-  topic: Topic[];
 }
 
 const AddNoteModal: React.FC<AddNoteModalProps> = ({
   visible,
   onCancel,
-  onSubmit,
+  onSave,
   loading,
   subject,
-  topic,
 }) => {
   const [form] = Form.useForm();
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [topic, setTopic] = useState<any>([]);
+
+  const fetchTopics = async () => {
+    try {
+      const topics = await getTopics(selectedSubject);
+
+      setTopic(topics);
+    } catch (error) {
+      console.error("Error fetching topics:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTopics();
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    setSelectedSubject(null);
+    setTopic([]);
+  }, []);
 
   const handleSubmit = () => {
-    // form
-    //   .validateFields()
-    //   .then((values) => {
-    //     form.resetFields();
-    //     onSubmit(values);
-    //   })
-    //   .catch(() => {});
+    form
+      .validateFields()
+      .then((values) => {
+        form.resetFields();
+        onSave(values);
+      })
+      .catch(() => {});
 
     onCancel();
   };
-
-  console.log("subject", subject);
-  console.log("topic", topic);
 
   return (
     <Modal
@@ -64,10 +81,11 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
               <Select
                 placeholder="Select Subject"
                 className="h-[45px] rounded-lg font-400"
-                options={subject?.map((item) => ({
+                options={subject?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id,
                 }))}
+                onChange={(value) => setSelectedSubject(value)}
               />
             </Form.Item>
           </Col>
@@ -82,9 +100,9 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
               <Select
                 placeholder="Select Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item) => ({
+                options={topic?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id,
                 }))}
               />
             </Form.Item>

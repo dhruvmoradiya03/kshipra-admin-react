@@ -1,50 +1,86 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Input, Upload, Button, Form, Select, Row, Col } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { Work_Sans } from "next/font/google";
+import { getTopics } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
 interface EditNoteModalProps {
   visible: boolean;
   onCancel: () => void;
-  onSubmit: (values: any) => void;
+  onSave: (values: any) => void;
   note: any;
   loading?: boolean;
   subjects: any[];
-  topics: any[];
 }
 
 const EditNoteModal: React.FC<EditNoteModalProps> = ({
   visible,
   onCancel,
-  onSubmit,
+  onSave,
   note,
   loading,
   subjects,
-  topics,
 }) => {
   const [form] = Form.useForm();
 
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [topic, setTopic] = useState<any>([]);
+  const [selectedTopic, setSelectedTopic] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchTopicsForSubject = async () => {
+      if (selectedSubject) {
+        try {
+          const topics = await getTopics(selectedSubject);
+          setTopic(topics);
+        } catch (error) {
+          console.error("Error fetching topics:", error);
+        }
+      } else {
+        setTopic([]);
+      }
+    };
+
+    fetchTopicsForSubject();
+  }, [selectedSubject]);
+
   useEffect(() => {
     if (note) {
+      // First set the selected subject and topic states
+      setSelectedSubject(note.subjectId);
+
+      console.log(note.file, "[][][][]this is done");
+
+      // Then set the form values
       form.setFieldsValue({
-        subject: note.subject || "",
-        topic: note.topic || "",
+        subject: note.subjectId || "",
+        topic: note.topicId || "",
         title: note.title || "",
-        pdfLink: note.pdfLink || "",
-        file: note.fileName ? [{ uid: "-1", name: note.fileName }] : [],
+        file: note.file || "",
       });
+
+      // If there's a subject, fetch its topics
+      if (note.subjectId) {
+        getTopics(note.subjectId).then((topics) => {
+          setTopic(topics);
+          // Set the topic after topics are loaded
+          setSelectedTopic(note.topicId);
+        });
+      }
     }
   }, [note, form]);
 
-  const handleSubmit = () => {
-    // form.validateFields().then((values) => {
-    //   onSubmit({ ...values, id: note?.id });
-    // });
-
-    onCancel();
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      onSave({ ...values, id: note?.document_id });
+      onCancel();
+    } catch (error) {
+      console.error("Validation failed:", error);
+    }
   };
 
   return (
@@ -73,10 +109,16 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
               <Select
                 placeholder="Select Subject"
                 className="h-[45px] rounded-lg font-400"
-                options={subjects?.map((item) => ({
+                options={subjects?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id,
                 }))}
+                value={selectedSubject}
+                onChange={(value) => {
+                  setSelectedSubject(value);
+                  setSelectedTopic(null); // Reset topic when subject changes
+                  form.setFieldsValue({ topic: undefined }); // Clear the topic field
+                }}
               />
             </Form.Item>
           </Col>
@@ -91,10 +133,13 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
               <Select
                 placeholder="Select Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={topics?.map((item) => ({
+                loading={!topic}
+                options={topic?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id,
                 }))}
+                value={selectedTopic}
+                onChange={(value) => setSelectedTopic(value)}
               />
             </Form.Item>
           </Col>
@@ -120,13 +165,14 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
 
         {/* FILE LINK + UPLOAD BUTTON */}
         <Form.Item
-          name="pdfLink"
+          name="file"
           label="Add PDF File Link"
           rules={[{ required: true, message: "Add Link" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <div className="flex gap-3">
             <Input
+              value={note.file}
               placeholder="Add Link"
               style={{
                 height: 45,
