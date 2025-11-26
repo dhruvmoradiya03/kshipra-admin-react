@@ -95,7 +95,7 @@ const NotesList: React.FC<NotesListProps> = ({
           showSizeChanger: true,
           showTotal: (total) => `Total ${total} items`,
           onChange: onPageChange,
-          onShowSizeChange: (current, size) => onPageChange?.(1, size),
+          onShowSizeChange: (current, size) => onPageChange?.(current, size),
         }}
         className="notes-table hide-scrollbar"
         rowClassName={() => "notes-table-row"}
@@ -103,7 +103,7 @@ const NotesList: React.FC<NotesListProps> = ({
           width: "100%",
         }}
         scroll={{
-          y: "47vh",
+          y: "52vh",
           x: "max-content",
         }}
       />

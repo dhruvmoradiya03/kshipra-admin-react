@@ -27,6 +27,7 @@ const ManageNotes = () => {
   const [topic, setTopic] = useState<any>([]);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedTopic, setSelectedTopic] = useState<any>(null);
+  const [stateUpdated, setStateUpdated] = useState(false);
 
   const [noteList, setNoteList] = useState<any>([]);
 
@@ -78,9 +79,10 @@ const ManageNotes = () => {
       setNoteList(result.data);
       setPagination((prev) => ({
         ...prev,
-        total: result.total || result.data.length,
+        total: result.total,
         current: page,
         pageSize,
+        lastVisible: result.lastVisible,
       }));
     } catch (error) {
       console.error("Error fetching notes:", error);
@@ -126,23 +128,32 @@ const ManageNotes = () => {
   }, [selectedSubject, selectedTopic, pagination.pageSize, pagination.current]);
 
   const handlePageChange = (page: number, pageSize?: number) => {
+    const resetLastVisible = page === 1 ? null : pagination.lastVisible;
+
     setPagination((prev) => ({
       ...prev,
       current: page,
       ...(pageSize && { pageSize }),
+      lastVisible: resetLastVisible,
     }));
     fetchNotes(page, pageSize);
   };
 
   // Handle subject change
   const handleSubjectChange = (subjectId: string) => {
+    setPagination({
+      current: 1,
+      pageSize: 10,
+      total: 0,
+      lastVisible: null,
+    });
+
     setSelectedSubject(subjectId);
     setSelectedTopic(null);
     fetchTopics();
   };
 
   const handleAddNote = async (values: any) => {
-    console.log(values);
     const newNote = {
       subjectId: values.subject,
       topicId: values.topic,
@@ -153,21 +164,17 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await addNote(newNote);
-      console.log(result);
     } catch (error) {
       console.error("Error adding note:", error);
     } finally {
       setLoading(false);
     }
 
-    setNoteList([...noteList, newNote]);
+    fetchNotes(pagination.current, pagination.pageSize, null);
     setIsAddModalVisible(false);
   };
 
   const handleEditNote = async (values: any) => {
-    // In a real app, this would be an API call
-    console.log(values);
-
     const updatedNote = {
       subjectId: values.subject,
       topicId: values.topic,
@@ -175,27 +182,18 @@ const ManageNotes = () => {
       file: values.file,
     };
 
-    const updatedNotes = noteList.map((note: any) =>
-      note.document_id === currentNote?.document_id
-        ? { ...note, ...updatedNote, file: values.file }
-        : note
-    );
-
-    console.log(updatedNotes);
-
     try {
       setLoading(true);
       const result = await updateNote(currentNote?.document_id, {
         ...updatedNote,
       });
-      console.log(result);
     } catch (error) {
       console.error("Error updating note:", error);
     } finally {
       setLoading(false);
     }
 
-    setNoteList(updatedNotes);
+    fetchNotes(pagination.current, pagination.pageSize, null);
     setIsEditModalVisible(false);
     setCurrentNote(null);
   };
@@ -204,23 +202,16 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await deleteNote(currentNote?.document_id);
-      console.log(result);
     } catch (error) {
       console.error("Error deleting note:", error);
     } finally {
       setLoading(false);
     }
 
-    if (currentNote) {
-      const updatedNotes = noteList.filter(
-        (note: any) => note.id !== currentNote.id
-      );
-      setNoteList(updatedNotes);
-      setIsDeleteModalVisible(false);
-      setCurrentNote(null);
-    }
+    fetchNotes(pagination.current, pagination.pageSize, null);
 
     setIsDeleteModalVisible(false);
+    setCurrentNote(null);
   };
 
   const handleEditClick = (note: any) => {
@@ -310,7 +301,15 @@ const ManageNotes = () => {
                   })),
                   selectable: true,
                   disabled: !selectedSubject,
-                  onSelect: (e) => setSelectedTopic(e.key),
+                  onSelect: (e) => {
+                    setPagination({
+                      current: 1,
+                      pageSize: 10,
+                      total: 0,
+                      lastVisible: null,
+                    });
+                    setSelectedTopic(e.key);
+                  },
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
@@ -336,7 +335,7 @@ const ManageNotes = () => {
             </div>
           </div>
         </div>
-        <div className="h-full flex-1 w-full flex bg-white p-5">
+        <div className="h-full flex-1 w-full flex bg-white px-4">
           {selectedSubject === null && (
             <div className="flex flex-col items-center justify-center gap-4 w-full">
               <Image
@@ -356,21 +355,35 @@ const ManageNotes = () => {
             </div>
           )}
 
-          {selectedSubject !== null && noteList.length > 0 && (
-            <div className="w-full">
-              <NotesList
-                notes={noteList}
-                onEdit={handleEditClick}
-                onDelete={handleDeleteClick}
-                onView={handleViewClick}
-                loading={loading}
-                total={pagination.total}
-                currentPage={pagination.current}
-                pageSize={pagination.pageSize}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
+          {selectedSubject !== null &&
+            (noteList.length > 0 ? (
+              <div className="w-full">
+                <NotesList
+                  notes={noteList}
+                  onEdit={handleEditClick}
+                  onDelete={handleDeleteClick}
+                  onView={handleViewClick}
+                  loading={loading}
+                  total={pagination.total}
+                  currentPage={pagination.current}
+                  pageSize={pagination.pageSize}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4 w-full">
+                <Image
+                  src="/images/no_content.svg"
+                  width={100}
+                  height={100}
+                  alt="No content available"
+                  priority
+                />
+                <div className="text-[#1E4640] font-bold text-2xl text-center">
+                  No Notes Found!
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import {
   getDoc,
   serverTimestamp,
   where,
+  getCountFromServer,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
@@ -66,8 +67,13 @@ export const addNote = async (noteData: any) => {
 export const updateNote = async (noteId: string, updateData: any) => {
   try {
     const noteRef = doc(db, "notes", noteId);
+
+    console.log(updateData, "this is update data");
     await updateDoc(noteRef, {
-      ...updateData,
+      subjectId: updateData.subjectId,
+      topicId: updateData.topicId,
+      title: updateData.title,
+      file: updateData.file,
       updatedAt: serverTimestamp(),
     });
     return { id: noteId, ...updateData };
@@ -158,6 +164,7 @@ export const getNoteById = async (noteId: string) => {
 };
 
 // Get notes by subject ID
+
 export const getNotesBySubjectId = async (
   subjectId: string,
   page: number = 1,
@@ -166,6 +173,17 @@ export const getNotesBySubjectId = async (
 ) => {
   try {
     const notesRef = collection(db, "notes");
+
+    // 🔥 1) Get total matching documents (only once per subject)
+    const countQuery = query(
+      notesRef,
+      where("subjectId", "==", subjectId),
+      where("isDeleted", "==", false)
+    );
+    const totalSnap = await getCountFromServer(countQuery);
+    const total = totalSnap.data().count;
+
+    // 🔥 2) Main paginated query
     let q = query(
       notesRef,
       where("subjectId", "==", subjectId),
@@ -174,6 +192,7 @@ export const getNotesBySubjectId = async (
       limit(pageSize)
     );
 
+    // If we have a cursor, apply it
     if (lastVisible) {
       q = query(
         notesRef,
@@ -192,14 +211,16 @@ export const getNotesBySubjectId = async (
       ...doc.data(),
     })) as Note[];
 
-    const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-    const hasMore = querySnapshot.docs.length === pageSize;
+    const lastVisibleDoc =
+      querySnapshot.docs[querySnapshot.docs.length - 1] || null;
+
+    const hasMore = page * pageSize < total;
 
     return {
       data: notes,
-      lastVisible: lastVisibleDoc,
+      lastVisible: lastVisibleDoc, // snapshot, not plain object
       hasMore,
-      total: notes.length,
+      total, // total matching docs (correct for pages UI)
       page,
       pageSize,
     };
@@ -218,6 +239,18 @@ export const getNotesByTopicId = async (
 ) => {
   try {
     const notesRef = collection(db, "notes");
+
+    // 1️⃣ Count total matching documents
+    const countQuery = query(
+      notesRef,
+      where("topicId", "==", topicId),
+      where("isDeleted", "==", false)
+    );
+
+    const totalSnap = await getCountFromServer(countQuery);
+    const total = totalSnap.data().count;
+
+    // 2️⃣ Build main paginated query
     let q = query(
       notesRef,
       where("topicId", "==", topicId),
@@ -226,6 +259,7 @@ export const getNotesByTopicId = async (
       limit(pageSize)
     );
 
+    // If we have a cursor (lastVisible), apply it
     if (lastVisible) {
       q = query(
         notesRef,
@@ -237,20 +271,25 @@ export const getNotesByTopicId = async (
       );
     }
 
+    // 3️⃣ Fetch page
     const querySnapshot = await getDocs(q);
-    const notes = querySnapshot.docs.map((doc) => ({
+
+    const notes = querySnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
     })) as Note[];
 
-    const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-    const hasMore = querySnapshot.docs.length === pageSize;
+    // 4️⃣ Get new cursor
+    const lastVisibleDoc =
+      querySnapshot.docs[querySnapshot.docs.length - 1] || null;
+
+    const hasMore = page * pageSize < total;
 
     return {
       data: notes,
-      lastVisible: lastVisibleDoc,
+      lastVisible: lastVisibleDoc, // snapshot
       hasMore,
-      total: notes.length,
+      total,
       page,
       pageSize,
     };
