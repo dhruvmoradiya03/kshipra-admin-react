@@ -27,7 +27,6 @@ const ManageNotes = () => {
   const [topic, setTopic] = useState<any>([]);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedTopic, setSelectedTopic] = useState<any>(null);
-  const [stateUpdated, setStateUpdated] = useState(false);
 
   const [noteList, setNoteList] = useState<any>([]);
 

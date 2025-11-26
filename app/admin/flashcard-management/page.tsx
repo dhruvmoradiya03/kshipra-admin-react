@@ -1,3 +1,3 @@
-import manageFlashcards from "@/components/manageFlashcards";
+import manageFlashcards from "@/components/flashcards/manageFlashcards";
 
 export default manageFlashcards;
