@@ -15,28 +15,38 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
-export interface Note {
+export interface Flashcard {
   id?: string;
   subjectId: string;
   topicId: string;
-  title: string;
-  file: string;
+  noteId: string;
+  question: string;
+  answer: string;
+  category: string;
   isDeleted: boolean;
   createdAt: any;
   updatedAt: any;
+  document_id?: string;
 }
 
-// Add a new note
-export const addNote = async (noteData: any) => {
+// Add a new flashcard
+export const addFlashcard = async (
+  flashcardData: Omit<
+    Flashcard,
+    "id" | "isDeleted" | "createdAt" | "updatedAt" | "document_id"
+  >
+) => {
   try {
     const timestamp = serverTimestamp();
 
     // Step 1: Create the document
-    const docRef = await addDoc(collection(db, "notes"), {
-      subjectId: noteData.subjectId,
-      topicId: noteData.topicId,
-      title: noteData.title,
-      file: noteData.file,
+    const docRef = await addDoc(collection(db, "flashcards"), {
+      subjectId: flashcardData.subjectId,
+      topicId: flashcardData.topicId,
+      noteId: flashcardData.noteId,
+      question: flashcardData.question,
+      answer: flashcardData.answer,
+      category: flashcardData.category,
       isDeleted: false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -49,65 +59,65 @@ export const addNote = async (noteData: any) => {
 
     return {
       id: docRef.id,
-      subjectId: noteData.subjectId,
-      topicId: noteData.topicId,
-      title: noteData.title,
-      file: noteData.file,
+      ...flashcardData,
       document_id: docRef.id,
+      isDeleted: false,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
   } catch (error) {
-    console.error("Error adding note:", error);
-    throw new Error("Failed to add note");
+    console.error("Error adding flashcard:", error);
+    throw new Error("Failed to add flashcard");
   }
 };
 
-// Update a note
-export const updateNote = async (noteId: string, updateData: any) => {
+// Update a flashcard
+export const updateFlashcard = async (
+  flashcardId: string,
+  updateData: Partial<
+    Omit<Flashcard, "id" | "createdAt" | "updatedAt" | "document_id">
+  >
+) => {
   try {
-    const noteRef = doc(db, "notes", noteId);
+    const flashcardRef = doc(db, "flashcards", flashcardId);
 
-    console.log(updateData, "this is update data");
-    await updateDoc(noteRef, {
-      subjectId: updateData.subjectId,
-      topicId: updateData.topicId,
-      title: updateData.title,
-      file: updateData.file,
+    await updateDoc(flashcardRef, {
+      ...updateData,
       updatedAt: serverTimestamp(),
     });
-    return { id: noteId, ...updateData };
+
+    return { id: flashcardId, ...updateData };
   } catch (error) {
-    console.error("Error updating note:", error);
-    throw new Error("Failed to update note");
+    console.error("Error updating flashcard:", error);
+    throw new Error("Failed to update flashcard");
   }
 };
 
-// Soft delete a note
-export const deleteNote = async (noteId: string) => {
+// Soft delete a flashcard
+export const deleteFlashcard = async (flashcardId: string) => {
   try {
-    const noteRef = doc(db, "notes", noteId);
-    await updateDoc(noteRef, {
+    const flashcardRef = doc(db, "flashcards", flashcardId);
+    await updateDoc(flashcardRef, {
       isDeleted: true,
       updatedAt: serverTimestamp(),
     });
     return { success: true };
   } catch (error) {
-    console.error("Error deleting note:", error);
-    throw new Error("Failed to delete note");
+    console.error("Error deleting flashcard:", error);
+    throw new Error("Failed to delete flashcard");
   }
 };
 
-// Get notes with pagination
-export const getNotes = async (
+// Get flashcards with pagination
+export const getFlashcards = async (
   page: number = 1,
   pageSize: number = 10,
   lastVisible: any = null
 ) => {
   try {
-    const notesRef = collection(db, "notes");
+    const flashcardsRef = collection(db, "flashcards");
     let q = query(
-      notesRef,
+      flashcardsRef,
       where("isDeleted", "==", false),
       orderBy("createdAt", "desc"),
       limit(pageSize)
@@ -115,7 +125,7 @@ export const getNotes = async (
 
     if (lastVisible) {
       q = query(
-        notesRef,
+        flashcardsRef,
         where("isDeleted", "==", false),
         orderBy("createdAt", "desc"),
         startAfter(lastVisible),
@@ -124,68 +134,67 @@ export const getNotes = async (
     }
 
     const querySnapshot = await getDocs(q);
-    const notes = querySnapshot.docs.map((doc) => ({
+    const flashcards = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as Note[];
+    })) as Flashcard[];
 
     const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
     const hasMore = querySnapshot.docs.length === pageSize;
 
     return {
-      data: notes,
+      data: flashcards,
       lastVisible: lastVisibleDoc,
       hasMore,
-      total: notes.length,
+      total: flashcards.length,
       page,
       pageSize,
     };
   } catch (error) {
-    console.error("Error fetching notes:", error);
-    throw new Error("Failed to fetch notes");
+    console.error("Error fetching flashcards:", error);
+    throw new Error("Failed to fetch flashcards");
   }
 };
 
-// Get a single note by ID
-export const getNoteById = async (noteId: string) => {
+// Get a single flashcard by ID
+export const getFlashcardById = async (flashcardId: string) => {
   try {
-    const noteRef = doc(db, "notes", noteId);
-    const noteSnap = await getDoc(noteRef);
+    const flashcardRef = doc(db, "flashcards", flashcardId);
+    const flashcardSnap = await getDoc(flashcardRef);
 
-    if (noteSnap.exists()) {
-      return { id: noteSnap.id, ...noteSnap.data() } as Note;
+    if (flashcardSnap.exists()) {
+      return { id: flashcardSnap.id, ...flashcardSnap.data() } as Flashcard;
     } else {
-      throw new Error("Note not found");
+      throw new Error("Flashcard not found");
     }
   } catch (error) {
-    console.error("Error getting note:", error);
-    throw new Error("Failed to get note");
+    console.error("Error getting flashcard:", error);
+    throw new Error("Failed to get flashcard");
   }
 };
 
-// Get notes by subject ID
-
-export const getNotesBySubjectId = async (
+// Get flashcards by subject ID
+export const getFlashcardsBySubjectId = async (
   subjectId: string,
   page: number = 1,
   pageSize: number = 10,
   lastVisible: any = null
 ) => {
   try {
-    const notesRef = collection(db, "notes");
+    const flashcardsRef = collection(db, "flashcards");
 
-    // 🔥 1) Get total matching documents (only once per subject)
+    // Get total matching documents
     const countQuery = query(
-      notesRef,
+      flashcardsRef,
       where("subjectId", "==", subjectId),
       where("isDeleted", "==", false)
     );
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
 
-    // 🔥 2) Main paginated query
+    // Main paginated query
     let q = query(
-      notesRef,
+      flashcardsRef,
       where("subjectId", "==", subjectId),
       where("isDeleted", "==", false),
       orderBy("createdAt", "desc"),
@@ -193,9 +202,9 @@ export const getNotesBySubjectId = async (
     );
 
     // If we have a cursor, apply it
-    if (lastVisible) {
+    if (lastVisible && page !== 1) {
       q = query(
-        notesRef,
+        flashcardsRef,
         where("subjectId", "==", subjectId),
         where("isDeleted", "==", false),
         orderBy("createdAt", "desc"),
@@ -205,64 +214,58 @@ export const getNotesBySubjectId = async (
     }
 
     const querySnapshot = await getDocs(q);
-
-    const notes = querySnapshot.docs.map((doc: any) => ({
+    const flashcards = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as Note[];
+    })) as Flashcard[];
 
-    const lastVisibleDoc =
-      querySnapshot.docs[querySnapshot.docs.length - 1] || null;
-
-    const hasMore = page * pageSize < total;
+    const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
 
     return {
-      data: notes,
-      lastVisible: lastVisibleDoc, // snapshot, not plain object
-      hasMore,
-      total, // total matching docs (correct for pages UI)
+      data: flashcards,
+      lastVisible: newLastVisible,
+      total,
       page,
       pageSize,
     };
   } catch (error) {
-    console.error("Error fetching notes by subject:", error);
-    throw new Error("Failed to fetch notes by subject");
+    console.error("Error fetching flashcards by subject ID:", error);
+    throw new Error("Failed to fetch flashcards by subject ID");
   }
 };
 
-// Get notes by topic ID
-export const getNotesByTopicId = async (
+// Get flashcards by topic ID
+export const getFlashcardsByTopicId = async (
   topicId: string,
   page: number = 1,
   pageSize: number = 10,
   lastVisible: any = null
 ) => {
   try {
-    const notesRef = collection(db, "notes");
+    const flashcardsRef = collection(db, "flashcards");
 
-    // 1️⃣ Count total matching documents
+    // Get total matching documents
     const countQuery = query(
-      notesRef,
+      flashcardsRef,
       where("topicId", "==", topicId),
       where("isDeleted", "==", false)
     );
-
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
 
-    // 2️⃣ Build main paginated query
+    // Main paginated query
     let q = query(
-      notesRef,
+      flashcardsRef,
       where("topicId", "==", topicId),
       where("isDeleted", "==", false),
       orderBy("createdAt", "desc"),
       limit(pageSize)
     );
 
-    // If we have a cursor (lastVisible), apply it
+    // If we have a cursor, apply it
     if (lastVisible && page !== 1) {
       q = query(
-        notesRef,
+        flashcardsRef,
         where("topicId", "==", topicId),
         where("isDeleted", "==", false),
         orderBy("createdAt", "desc"),
@@ -271,30 +274,24 @@ export const getNotesByTopicId = async (
       );
     }
 
-    // 3️⃣ Fetch page
     const querySnapshot = await getDocs(q);
-
-    const notes = querySnapshot.docs.map((doc: any) => ({
+    const flashcards = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as Note[];
+    })) as Flashcard[];
 
-    // 4️⃣ Get new cursor
-    const lastVisibleDoc =
+    const newLastVisible =
       querySnapshot.docs[querySnapshot.docs.length - 1] || null;
 
-    const hasMore = page * pageSize < total;
-
     return {
-      data: notes,
-      lastVisible: lastVisibleDoc, // snapshot
-      hasMore,
+      data: flashcards,
+      lastVisible: newLastVisible,
       total,
       page,
       pageSize,
     };
   } catch (error) {
-    console.error("Error fetching notes by topic:", error);
-    throw new Error("Failed to fetch notes by topic");
+    console.error("Error fetching flashcards by topic ID:", error);
+    throw new Error("Failed to fetch flashcards by topic ID");
   }
 };

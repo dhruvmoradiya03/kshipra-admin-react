@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal, Form, Input, Select, Button, message, Col, Row } from "antd";
 import { Work_Sans } from "next/font/google";
 import { getTopics } from "@/service/api/config.api";
+import { getNotesByTopicId } from "@/service/api/notes.api";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -23,9 +24,10 @@ interface Flashcard {
   id: string;
   subjectId: string;
   topicId: string;
+  noteId: string;
   question: string;
   answer: string;
-  category?: string;
+  category: string;
 }
 
 interface EditFlashCardModalProps {
@@ -43,54 +45,116 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
   onSave,
   flashcard,
   subjects,
-  topics,
 }) => {
   const [form] = Form.useForm();
-  const [filteredTopics, setFilteredTopics] = useState<Topic[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [currentTopicTitle, setCurrentTopicTitle] = useState<string>("");
 
-  const [topic, setTopic] = useState<any>([]);
-  const [selectedTopic, setSelectedTopic] = useState<any>(null);
-
+  // Fetch topics when subject changes
   useEffect(() => {
     const fetchTopicsForSubject = async () => {
       if (selectedSubject) {
         try {
-          const topics = await getTopics(selectedSubject);
-          setTopic(topics);
+          const topicsData = await getTopics(selectedSubject);
+          setTopics(topicsData);
         } catch (error) {
           console.error("Error fetching topics:", error);
+          message.error("Failed to load topics");
         }
       } else {
-        setTopic([]);
+        setTopics([]);
+        setNotes([]);
       }
     };
 
     fetchTopicsForSubject();
   }, [selectedSubject]);
 
+  // Fetch notes when topic changes
+  useEffect(() => {
+    const fetchNotes = async () => {
+      if (selectedTopic) {
+        setIsLoadingNotes(true);
+        try {
+          const notesData = await getNotesByTopicId(selectedTopic);
+          setNotes(notesData.data);
+        } catch (error) {
+          console.error("Error fetching notes:", error);
+          message.error("Failed to load notes");
+        } finally {
+          setIsLoadingNotes(false);
+        }
+      } else {
+        setNotes([]);
+      }
+    };
+
+    fetchNotes();
+  }, [selectedTopic]);
+
+  // Update current topic title when topics or selected topic changes
+  useEffect(() => {
+    if (selectedTopic && topics.length > 0) {
+      const topic = topics.find(
+        (t) => t.document_id === selectedTopic || t.id === selectedTopic
+      );
+      if (topic) {
+        setCurrentTopicTitle(topic.name);
+      }
+    } else {
+      setCurrentTopicTitle("");
+    }
+  }, [selectedTopic, topics]);
+
+  // Initialize form with flashcard data
   useEffect(() => {
     if (visible && flashcard) {
+      // Set the selected subject and topic
       setSelectedSubject(flashcard.subjectId);
+      setSelectedTopic(flashcard.topicId);
 
+      // Set form values
       form.setFieldsValue({
         subjectId: flashcard.subjectId,
         topicId: flashcard.topicId,
+        noteId: flashcard.noteId,
         question: flashcard.question,
         answer: flashcard.answer,
         category: flashcard.category || "",
       });
     } else {
+      // Reset form and states when modal is closed
       form.resetFields();
-      setFilteredTopics([]);
       setSelectedSubject(null);
+      setSelectedTopic(null);
+      setNotes([]);
     }
   }, [visible, flashcard, form]);
 
-  const handleSubjectChange = async (subjectId: string) => {
+  const handleSubjectChange = (subjectId: string) => {
     setSelectedSubject(subjectId);
-    form.setFieldsValue({ topicId: undefined });
+    setSelectedTopic(null);
+    setNotes([]);
+    form.setFieldsValue({
+      topicId: undefined,
+      noteId: undefined,
+    });
+  };
+
+  const handleTopicChange = (topicId: string) => {
+    setSelectedTopic(topicId);
+    form.setFieldsValue({ noteId: undefined });
+
+    // Update current topic title
+    const selected = topics.find(
+      (t) => t.document_id === topicId || t.id === topicId
+    );
+    setCurrentTopicTitle(selected?.name || "");
   };
 
   const handleSubmit = async () => {
@@ -98,8 +162,8 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
       setLoading(true);
       const values = await form.validateFields();
       await onSave({
-        ...values,
         id: flashcard?.id,
+        ...values,
       });
       message.success("Flashcard updated successfully!");
     } catch (error) {
@@ -138,7 +202,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
                 onChange={handleSubjectChange}
                 options={subjects?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id,
                 }))}
               />
             </Form.Item>
@@ -154,9 +218,11 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
               <Select
                 placeholder="Select Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={filteredTopics?.map((item: any) => ({
+                onChange={handleTopicChange}
+                loading={!selectedSubject}
+                options={topics?.map((item: any) => ({
                   label: item.name,
-                  value: item.id,
+                  value: item.document_id || item.id,
                 }))}
               />
             </Form.Item>
@@ -166,17 +232,21 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         <Row gutter={20}>
           <Col className="w-full">
             <Form.Item
-              name="noteTitle"
-              label="Note Title"
-              rules={[{ required: true, message: "Please select note title" }]}
+              name="noteId"
+              label="Select Note"
+              rules={[{ required: true, message: "Please select a note" }]}
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Note Title"
+                placeholder={
+                  isLoadingNotes ? "Loading notes..." : "Select Note"
+                }
                 className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item: any) => ({
-                  label: item.name,
-                  value: item.document_id,
+                loading={isLoadingNotes}
+                disabled={!selectedTopic}
+                options={notes.map((note) => ({
+                  label: note.title,
+                  value: note.document_id || note.id,
                 }))}
               />
             </Form.Item>
@@ -189,17 +259,15 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
           rules={[{ required: true, message: "Please enter a question" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
-          <div className="flex gap-3">
-            <Input
-              placeholder="Add Question"
-              style={{
-                height: 45,
-                borderRadius: 8,
-                fontFamily: "Work Sans",
-                fontWeight: 400,
-              }}
-            />
-          </div>
+          <Input
+            placeholder="Add Question"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
         </Form.Item>
 
         <Form.Item
@@ -208,53 +276,64 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
           rules={[{ required: true, message: "Please enter an answer" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
-          <div className="flex gap-3">
-            <Input
-              placeholder="Add Answer"
-              style={{
-                height: 45,
-                borderRadius: 8,
-                fontFamily: "Work Sans",
-                fontWeight: 400,
-              }}
-            />
-          </div>
+          <Input
+            placeholder="Add Answer"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
         </Form.Item>
 
         <Form.Item
           name="category"
           label="Category"
+          rules={[{ required: true, message: "Please enter a category" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
-          <div className="flex gap-3">
-            <Input
-              placeholder="Add Category"
-              style={{
-                height: 45,
-                borderRadius: 8,
-                fontFamily: "Work Sans",
-                fontWeight: 400,
-              }}
-            />
-          </div>
+          <Input
+            placeholder="Add Category"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
         </Form.Item>
       </Form>
 
       {/* FOOTER BUTTONS */}
-      <div className="flex justify-end gap-4 mt-8">
+      <div className={`flex justify-end gap-4 mt-8 ${worksans.className}`}>
         <Button
           onClick={onCancel}
-          className="h-10 px-6 text-[#1E4640] font-medium border border-[#1E4640] rounded-lg"
+          style={{
+            height: 44,
+            width: 120,
+            borderRadius: 8,
+            border: "1px solid #1E4640",
+            fontFamily: "Work Sans",
+            color: "#1E4640",
+          }}
         >
           Cancel
         </Button>
+
         <Button
           type="primary"
-          className="h-10 px-6 bg-[#1E4640] hover:bg-[#1E4640]/90 text-white font-medium rounded-lg"
+          loading={loading}
           onClick={handleSubmit}
-          loading={false}
+          style={{
+            height: 44,
+            width: 120,
+            borderRadius: 8,
+            backgroundColor: "#0B5447",
+            fontFamily: "Work Sans",
+          }}
         >
-          Update Flashcard
+          Save
         </Button>
       </div>
     </Modal>

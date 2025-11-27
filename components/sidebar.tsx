@@ -54,11 +54,10 @@ const Sidebar = () => {
     >
       <div>
         <div className="p-6">
-          <Image
-            src="/images/kshipra-logo.svg"
-            alt="Logo"
-            width={100}
-            height={100}
+          <object
+            data="/images/kshipra-logo.svg"
+            type="image/svg+xml"
+            className="image-logo"
           />
         </div>
 

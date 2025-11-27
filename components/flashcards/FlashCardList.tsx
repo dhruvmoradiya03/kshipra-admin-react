@@ -1,9 +1,83 @@
-import React from "react";
-import { Button, Card, Space, Table, Typography } from "antd";
-import { Note } from "../notes/types";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import React, { useMemo, useState, useEffect } from "react";
+import { Button, Card, Space, Table, Typography, Skeleton } from "antd";
+import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
+// import { Flashcard } from "@/types/flashcard";
+import { getNoteById } from "@/service/api/notes.api";
 
 const { Text } = Typography;
+
+// Custom hook to fetch and cache note titles
+const useNoteTitles = (noteIds: string[]) => {
+  const [noteTitles, setNoteTitles] = useState<Record<string, string>>({});
+  const [loadingNotes, setLoadingNotes] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const fetchNoteTitles = async () => {
+      const newNoteTitles: Record<string, string> = {};
+      const newLoadingNotes: Record<string, boolean> = {};
+
+      // Only process notes that haven't been loaded yet
+      const notesToFetch = noteIds.filter(
+        (id) => !(id in noteTitles) && !loadingNotes[id]
+      );
+
+      if (notesToFetch.length === 0) return;
+
+      // Set loading state for all notes being fetched
+      notesToFetch.forEach((id) => {
+        newLoadingNotes[id] = true;
+      });
+      setLoadingNotes((prev) => ({ ...prev, ...newLoadingNotes }));
+
+      try {
+        // Fetch all notes in parallel
+        const fetchPromises = notesToFetch.map(async (id) => {
+          try {
+            const note = await getNoteById(id);
+            if (note) {
+              newNoteTitles[id] = note.title || "Untitled Note";
+            }
+          } catch (error) {
+            console.error(`Error fetching note ${id}:`, error);
+            newNoteTitles[id] = "Error loading title";
+          }
+          return id;
+        });
+
+        await Promise.all(fetchPromises);
+
+        // Update state with new note titles
+        setNoteTitles((prev) => ({
+          ...prev,
+          ...newNoteTitles,
+        }));
+      } finally {
+        // Clear loading states
+        const updatedLoadingNotes = { ...loadingNotes };
+        notesToFetch.forEach((id) => {
+          delete updatedLoadingNotes[id];
+        });
+        setLoadingNotes(updatedLoadingNotes);
+      }
+    };
+
+    fetchNoteTitles();
+  }, [noteIds.join(",")]); // Only re-run when noteIds change
+
+  return { noteTitles, loadingNotes };
+};
+
+interface Flashcard {
+  id: string;
+  subjectId: string;
+  topicId: string;
+  noteId: string;
+  question: string;
+  answer: string;
+  category: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface Flashcard {
   id: string;
@@ -23,6 +97,8 @@ interface FlashCardListProps {
   onDelete: (flashcard: Flashcard) => void;
   loading?: boolean;
   onView: (flashcard: Flashcard) => void;
+  pagination?: any;
+  onPageChange?: (page: number, pageSize?: number) => void;
 }
 
 const FlashCardList: React.FC<FlashCardListProps> = ({
@@ -30,23 +106,38 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
   onEdit,
   onDelete,
   loading,
+  pagination,
+  onPageChange = () => {},
 }) => {
+  // Extract unique note IDs from flashcards
+  const noteIds = useMemo(() => {
+    const ids = new Set<string>();
+    flashcards.forEach((card) => {
+      if (card.noteId) {
+        ids.add(card.noteId);
+      }
+    });
+    return Array.from(ids);
+  }, [flashcards]);
+
+  const { noteTitles, loadingNotes } = useNoteTitles(noteIds);
   const columns = [
     {
       title: "Note Title",
-      dataIndex: "title",
-      key: "title",
+      dataIndex: ["noteId"],
+      key: "noteTitle",
       width: "24%",
-      render: (text: string, record: Flashcard) => (
-        <Text
-          ellipsis
-          style={{ cursor: "pointer", color: "#1890ff", maxWidth: "230px" }}
-        >
-          {/* {text} */}
-          An object at rest stays at rest, and an object in motion stays in
-          motion unless acted upon by an external force.
-        </Text>
-      ),
+      render: (noteId: string) => {
+        if (loadingNotes[noteId]) {
+          return <Skeleton.Input active size="small" style={{ width: 150 }} />;
+        }
+        const title = noteTitles[noteId] || "Untitled Note";
+        return (
+          <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+            {title}
+          </Text>
+        );
+      },
     },
     {
       title: "Question",
@@ -54,13 +145,8 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       key: "question",
       width: "24%",
       render: (text: string, record: Flashcard) => (
-        <Text
-          ellipsis
-          style={{ cursor: "pointer", color: "#1890ff", maxWidth: "230px" }}
-        >
-          {/* {text} */}
-          An object at rest stays at rest, and an object in motion stays in
-          motion unless acted upon by an external force.
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          {text}
         </Text>
       ),
     },
@@ -70,13 +156,8 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       key: "answer",
       width: "24%",
       render: (text: string, record: Flashcard) => (
-        <Text
-          ellipsis
-          style={{ cursor: "pointer", color: "#1890ff", maxWidth: "230px" }}
-        >
-          {/* {text} */}
-          An object at rest stays at rest, and an object in motion stays in
-          motion unless acted upon by an external force.
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          {text}
         </Text>
       ),
     },
@@ -87,12 +168,8 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       key: "category",
       width: "14%",
       render: (text: string, record: Flashcard) => (
-        <Text
-          ellipsis
-          style={{ cursor: "pointer", color: "#1890ff", maxWidth: "230px" }}
-        >
-          {/* {text} */}
-          Physics
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          {text}
         </Text>
       ),
     },
@@ -136,6 +213,15 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
         //   y: "52vh",
         //   x: "max-content",
         // }}
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} items`,
+          onChange: onPageChange,
+          onShowSizeChange: (page, pageSize) => onPageChange?.(page, pageSize),
+        }}
       />
     </div>
   );

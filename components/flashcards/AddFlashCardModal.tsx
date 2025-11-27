@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { Modal, Form, Input, Select, Button, Col, Row } from "antd";
+import React, { useState, useEffect, useMemo } from "react";
+import { Modal, Form, Input, Select, Button, Col, Row, Spin } from "antd";
 import { Work_Sans } from "next/font/google";
 import { getTopics } from "@/service/api/config.api";
-
-const { TextArea } = Input;
-const { Option } = Select;
+import { getNotes, getNotesByTopicId } from "@/service/api/notes.api";
+import { debounce } from "lodash";
 
 interface Subject {
   id: string;
@@ -37,7 +36,17 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedTopic, setSelectedTopic] = useState<any>(null);
   const [topic, setTopic] = useState<any>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [selectedNote, setSelectedNote] = useState<any>(null);
+  const [loadingDropdown, setLoadingDropdown] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    lastVisible: null as any,
+  });
 
   const fetchTopics = async () => {
     try {
@@ -49,23 +58,101 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
     }
   };
 
+  const fetchNotes = async (isLoadMore = false) => {
+    try {
+      if (!selectedTopic) return;
+
+      setLoadingDropdown(true);
+      const { page, pageSize, lastVisible } = isLoadMore
+        ? { ...pagination, page: pagination.page + 1 }
+        : { ...pagination, page: 1 };
+
+      const response = await getNotesByTopicId(
+        selectedTopic,
+        page,
+        pageSize,
+        lastVisible
+      );
+
+      if (isLoadMore) {
+        setNotes((prevNotes) => [...prevNotes, ...response.data]);
+      } else {
+        setNotes(response.data);
+      }
+
+      setPagination({
+        page,
+        pageSize,
+        total: response.total,
+        lastVisible: response.lastVisible,
+      });
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+    } finally {
+      setLoadingDropdown(false);
+    }
+  };
+
+  // Debounced version of fetchNotes for better performance
+  const debouncedFetchNotes = useMemo(
+    () => debounce(fetchNotes, 300),
+    [selectedTopic, pagination]
+  );
+
+  // Handle scroll event for infinite loading
+  const handlePopupScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { target } = e;
+    const scrollElement = target as HTMLElement;
+    const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+    const scrollThreshold = 50; // pixels from bottom
+
+    if (
+      !loadingDropdown &&
+      pagination.page * pagination.pageSize < pagination.total &&
+      scrollTop + clientHeight >= scrollHeight - scrollThreshold
+    ) {
+      fetchNotes(true);
+    }
+  };
+
   useEffect(() => {
     fetchTopics();
   }, [selectedSubject]);
 
   useEffect(() => {
+    // Reset pagination when topic changes
+    setPagination({
+      page: 1,
+      pageSize: 10,
+      total: 0,
+      lastVisible: null,
+    });
+    setNotes([]);
+    if (selectedTopic) {
+      fetchNotes();
+    }
+  }, [selectedTopic]);
+
+  useEffect(() => {
     setSelectedSubject(null);
+    setSelectedTopic(null);
     setTopic([]);
+    setNotes([]);
+
+    // Cleanup debounce on unmount
+    return () => {
+      debouncedFetchNotes.cancel();
+    };
   }, []);
 
   const handleSubmit = () => {
-    // form
-    //   .validateFields()
-    //   .then((values) => {
-    //     form.resetFields();
-    //     onSave(values);
-    //   })
-    //   .catch(() => {});
+    form
+      .validateFields()
+      .then((values) => {
+        form.resetFields();
+        onSave(values);
+      })
+      .catch(() => {});
 
     onCancel();
   };
@@ -115,8 +202,10 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
                 className="h-[45px] rounded-lg font-400"
                 options={topic?.map((item: any) => ({
                   label: item.name,
+                  topicId: item.document_id,
                   value: item.document_id,
                 }))}
+                onChange={(value) => setSelectedTopic(value)}
               />
             </Form.Item>
           </Col>
@@ -124,18 +213,54 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         <Row gutter={20}>
           <Col className="w-full">
             <Form.Item
-              name="noteTitle"
+              name="note"
               label="Note Title"
               rules={[{ required: true, message: "Enter note title" }]}
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Topic"
-                className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item: any) => ({
-                  label: item.name,
+                placeholder="Select Note"
+                className="h-[45px] rounded-lg font-400 w-full [&_.ant-select-selector]:h-full [&_.ant-select-selection-item]:h-full [&_.ant-select-selection-item]:flex [&_.ant-select-selection-item]:items-center"
+                showSearch
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                  (option?.label ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                listHeight={250}
+                dropdownMatchSelectWidth={false}
+                dropdownStyle={{ padding: 0 }}
+                popupClassName="[&_.ant-select-item-option-content]:whitespace-normal"
+                onPopupScroll={handlePopupScroll}
+                dropdownRender={(menu) => (
+                  <>
+                    {menu}
+                    {/* {loadingDropdown && (
+                      <div className="flex justify-center p-2">
+                        <Spin size="small" />
+                      </div>
+                    )} */}
+                    {/* {!loadingDropdown &&
+                      pagination.page * pagination.pageSize >=
+                        pagination.total &&
+                      pagination.total > 0 && (
+                        <div className="text-center p-2 text-gray-500 text-sm">
+                          No more notes
+                        </div>
+                      )} */}
+                    {/* {!loadingDropdown && notes.length === 0 && (
+                      <div className="text-center p-2 text-gray-500 text-sm">
+                        No notes found
+                      </div>
+                    )} */}
+                  </>
+                )}
+                options={notes.map((item: any) => ({
+                  label: item.title,
                   value: item.document_id,
                 }))}
+                onChange={(value) => setSelectedNote(value)}
               />
             </Form.Item>
           </Col>
@@ -144,7 +269,7 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         <Form.Item
           name="question"
           label="Question"
-          rules={[{ required: true }]}
+          rules={[{ required: true, message: "Add Question" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <div className="flex gap-3">

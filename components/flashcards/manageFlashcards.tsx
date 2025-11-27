@@ -11,34 +11,17 @@ import EditFlashCardModal from "./EditFlashCardModal";
 import DeleteFlashCardModal from "./DeleteFlashCardModal";
 import { getSubjects, getTopics } from "@/service/api/config.api";
 import "./flashcard.css";
+import {
+  addFlashcard,
+  deleteFlashcard,
+  getFlashcards,
+  getFlashcardsBySubjectId,
+  getFlashcardsByTopicId,
+  updateFlashcard,
+} from "@/service/api/flashcard.api";
+import UploadFlashCardModal from "./UploadCardModal";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
-
-const dummyFlashcards = [
-  {
-    id: "f1",
-    subjectId: "1",
-    topicId: "t1",
-    noteId: "n1",
-    question: "What is the quadratic formula?",
-    answer: "x = [-b ± √(b² - 4ac)] / (2a)",
-    category: "Mathematics",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "f2",
-    subjectId: "2",
-    topicId: "t3",
-    noteId: "n2",
-    question: "What is Newton's first law of motion?",
-    answer:
-      "An object at rest stays at rest, and an object in motion stays in motion unless acted upon by an external force.",
-    category: "Physics",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
 
 const ManageFlashcards = () => {
   const [subject, setSubject] = useState<any>([]);
@@ -46,14 +29,22 @@ const ManageFlashcards = () => {
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedTopic, setSelectedTopic] = useState<any>(null);
 
-  const [flashcardList, setFlashcardList] = useState(dummyFlashcards);
+  const [flashcardList, setFlashcardList] = useState<any>([]);
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [currentFlashcard, setCurrentFlashcard] = useState<any>(null);
+  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
+
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    lastVisible: null as any,
+  });
 
   const fetchSubjects = async () => {
     try {
@@ -82,6 +73,70 @@ const ManageFlashcards = () => {
     }
   };
 
+  const fetchFlashcards = async (
+    page = pagination.page,
+    pageSize = pagination.pageSize,
+    lastVisible = pagination.lastVisible
+  ) => {
+    try {
+      setLoading(true);
+
+      console.log(page, pageSize, lastVisible);
+      if (selectedSubject && selectedTopic) {
+        const flashcards: any = await getFlashcardsByTopicId(
+          selectedTopic,
+          page,
+          pageSize,
+          lastVisible
+        );
+        setFlashcardList(flashcards.data);
+        setPagination((prev) => ({
+          ...prev,
+          total: flashcards.total,
+          page: flashcards.page,
+          pageSize: flashcards.pageSize,
+          lastVisible: flashcards.lastVisible,
+        }));
+      } else if (selectedSubject) {
+        const flashcards: any = await getFlashcardsBySubjectId(
+          selectedSubject,
+          page,
+          pageSize,
+          lastVisible
+        );
+        setFlashcardList(flashcards.data);
+        setPagination((prev) => ({
+          ...prev,
+          total: flashcards.total,
+          page: flashcards.page,
+          pageSize: flashcards.pageSize,
+          lastVisible: flashcards.lastVisible,
+        }));
+      } else {
+        console.log("No flashcards found");
+        setFlashcardList([]);
+        setPagination((prev) => ({
+          ...prev,
+          total: 0,
+          page: 1,
+          pageSize: 10,
+          lastVisible: null,
+        }));
+        return;
+      }
+    } catch (error) {
+      console.error("Error fetching flashcards:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  console.log(flashcardList, "this is flashcardList");
+
+  useEffect(() => {
+    fetchFlashcards();
+  }, [selectedSubject, selectedTopic]);
+
   useEffect(() => {
     fetchSubjects();
     fetchTopics();
@@ -96,18 +151,41 @@ const ManageFlashcards = () => {
   // Handle topic change
   const handleTopicChange = (topicId: string) => {
     setSelectedTopic(topicId);
-    // Filter flashcards based on selected topic
-    const filteredFlashcards = dummyFlashcards.filter(
-      (flashcard) => flashcard.topicId === topicId
-    );
-    setFlashcardList(filteredFlashcards);
   };
 
   // Handle add flashcard
-  const handleAddFlashcard = (values: any) => {
-    console.log("Adding flashcard:", values);
-    // In a real app, this would call the API
+  const handleAddFlashcard = async (values: any) => {
+    try {
+      setLoading(true);
+      const response = await addFlashcard({
+        subjectId: values.subject,
+        topicId: values.topic,
+        noteId: values.note,
+        question: values.question,
+        answer: values.answer,
+        category: values.category,
+      });
+
+      console.log(response, "this is response");
+    } catch (error) {
+      console.error("Error adding flashcard:", error);
+    } finally {
+      setLoading(false);
+    }
+
     setIsAddModalVisible(false);
+  };
+
+  const handlePageChange = (page: number, pageSize?: number) => {
+    const resetLastVisible = page === 1 ? null : pagination.lastVisible;
+
+    setPagination((prev) => ({
+      ...prev,
+      current: page,
+      ...(pageSize && { pageSize }),
+      lastVisible: resetLastVisible,
+    }));
+    fetchFlashcards(page, pageSize);
   };
 
   const handleViewClick = (flashcard: any) => {
@@ -116,17 +194,42 @@ const ManageFlashcards = () => {
   };
 
   // Handle edit flashcard
-  const handleEditFlashcard = (values: any) => {
+  const handleEditFlashcard = async (values: any) => {
     console.log("Updating flashcard:", values);
-    // In a real app, this would call the API
+
+    try {
+      setLoading(true);
+      const response = await updateFlashcard(values.id, values);
+      console.log(response, "this is response");
+    } catch (error) {
+      console.error("Error updating flashcard:", error);
+    } finally {
+      setLoading(false);
+    }
+
     setIsEditModalVisible(false);
     setCurrentFlashcard(null);
   };
 
+  const handleUploadFlashcard = (values: any) => {
+    console.log(values, "this is values");
+    setIsUploadModalVisible(false);
+  };
+
   // Handle delete flashcard
-  const handleDeleteFlashcard = () => {
+  const handleDeleteFlashcard = async () => {
     console.log("Deleting flashcard:", currentFlashcard?.id);
-    // In a real app, this would call the API
+
+    try {
+      setLoading(true);
+      const response = await deleteFlashcard(currentFlashcard?.id);
+      console.log(response, "this is response");
+    } catch (error) {
+      console.error("Error deleting flashcard:", error);
+    } finally {
+      setLoading(false);
+    }
+
     setIsDeleteModalVisible(false);
     setCurrentFlashcard(null);
   };
@@ -252,7 +355,7 @@ const ManageFlashcards = () => {
               </div>
               <button
                 className="text-[#1E4640] bg-[#1E4640] font-medium shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-6 cursor-pointer text-white rounded-xl items-center justify-center flex transition-all duration-300 hover:-translate-y-0.2"
-                onClick={() => setIsAddModalVisible(true)}
+                onClick={() => setIsUploadModalVisible(true)}
               >
                 Upload via CSV
               </button>
@@ -288,6 +391,8 @@ const ManageFlashcards = () => {
                   onDelete={handleDeleteClick}
                   onView={handleViewClick}
                   loading={loading}
+                  pagination={pagination}
+                  onPageChange={handlePageChange}
                 />
               </div>
             ) : (
@@ -300,7 +405,7 @@ const ManageFlashcards = () => {
                   priority
                 />
                 <div className="text-[#1E4640] font-bold text-2xl text-center">
-                  No Notes Found!
+                  No Flashcards Found!
                 </div>
               </div>
             ))}
@@ -312,6 +417,14 @@ const ManageFlashcards = () => {
         visible={isAddModalVisible}
         onCancel={() => setIsAddModalVisible(false)}
         onSave={handleAddFlashcard}
+        subjects={subject}
+        topics={topic}
+      />
+
+      <UploadFlashCardModal
+        visible={isUploadModalVisible}
+        onCancel={() => setIsUploadModalVisible(false)}
+        onSave={handleUploadFlashcard}
         subjects={subject}
         topics={topic}
       />
@@ -339,7 +452,6 @@ const ManageFlashcards = () => {
           setCurrentFlashcard(null);
         }}
         onConfirm={handleDeleteFlashcard}
-        flashcard={currentFlashcard}
       />
     </div>
   );

@@ -80,13 +80,11 @@ const Login = () => {
             alt="Login"
             priority
           />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-            <Image
-              src="/images/logo.svg"
-              width={330}
-              height={330}
-              alt="Kshipra Logo"
-              priority
+          <div className="absolute inset-0 flex items-center justify-center">
+            <object
+              data="/images/logo.svg"
+              type="image/svg+xml"
+              className="image-logo"
             />
           </div>
         </div>
