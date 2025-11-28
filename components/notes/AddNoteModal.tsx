@@ -38,6 +38,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
   const [topic, setTopic] = useState<any>([]);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
 
   const fetchTopics = async () => {
     try {
@@ -67,13 +68,18 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
       const values = await form.validateFields();
 
       // If there's a file to upload, upload it first
-      if (fileList.length > 0 && fileList[0].originFileObj) {
+      if (fileList.length > 0) {
+        const file = fileList[0].originFileObj as File;
+        if (!file) {
+          message.error("No file selected or invalid file");
+          return;
+        }
+        
         setIsUploading(true);
         try {
-          const fileUrl = await handleUpload(
-            fileList[0].originFileObj,
-            "notes"
-          );
+          console.log("Uploading file:", file);
+          const fileUrl = await handleUpload(file, "notes");
+          console.log("File uploaded successfully. URL:", fileUrl);
           values.file = fileUrl; // Update the file URL with the uploaded file
         } catch (error) {
           console.error("Error uploading file:", error);
@@ -82,6 +88,12 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
         } finally {
           setIsUploading(false);
         }
+      } else if (values.file) {
+        // If no file was uploaded but there's a direct link, use that
+        values.file = values.file.trim();
+      } else {
+        message.error("Please provide either a file or a link");
+        return;
       }
 
       form.resetFields();
@@ -92,26 +104,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
     }
   };
 
-  const handleFileChange = (info: {
-    file: UploadFile;
-    fileList: UploadFile[];
-  }) => {
-    if (info.file) {
-      // Only allow one file
-      if (info.fileList.length > 1) {
-        message.warning(
-          "Only one file can be uploaded at a time. The previous file will be replaced."
-        );
-        // Keep only the last selected file
-        const lastFile = info.fileList[info.fileList.length - 1];
-        setFileList([lastFile]);
-      } else {
-        setFileList([info.file]);
-      }
-      // Clear the link input when a file is selected
-      form.setFieldsValue({ pdfLink: "" });
-    }
-  };
+  // This function is no longer needed as we're handling the file list directly in the Upload component
 
   return (
     <Modal
@@ -185,7 +178,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
 
         {/* FILE LINK + UPLOAD BUTTON */}
         <Form.Item
-          name="pdfLink"
+          name="file"
           label="PDF File (Link or Upload)"
           rules={[
             {
@@ -211,6 +204,7 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
                 fontWeight: 400,
               }}
               disabled={fileList.length > 0}
+              value={currentFileUrl || ""}
               onChange={(e) => {
                 if (e.target.value) {
                   setFileList([]); // Clear file list when typing in the link
@@ -220,14 +214,19 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
 
             <Upload
               beforeUpload={(file) => {
-                if (file.type !== "application/pdf") {
-                  message.error("You can only upload PDF files!");
-                  return Upload.LIST_IGNORE;
-                }
-                handleFileChange({ file, fileList: [file] });
+                // Always return false to prevent automatic upload
                 return false;
               }}
               fileList={fileList}
+              onChange={(info) => {
+                if (info.fileList.length > 1) {
+                  // If more than one file, keep only the last one
+                  const lastFile = info.fileList[info.fileList.length - 1];
+                  setFileList([lastFile]);
+                } else {
+                  setFileList(info.fileList);
+                }
+              }}
               onRemove={() => {
                 setFileList([]);
                 return true;

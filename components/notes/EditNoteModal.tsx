@@ -1,6 +1,17 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Modal, Input, Upload, Button, Form, Select, Row, Col, message, UploadFile } from "antd";
+import {
+  Modal,
+  Input,
+  Upload,
+  Button,
+  Form,
+  Select,
+  Row,
+  Col,
+  message,
+  UploadFile,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { Work_Sans } from "next/font/google";
 import { getTopics, handleUpload } from "@/service/api/config.api";
@@ -78,16 +89,19 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      
+
       // If there's a file to upload, upload it first
       if (fileList.length > 0 && fileList[0].originFileObj) {
         setIsUploading(true);
         try {
-          const fileUrl = await handleUpload(fileList[0].originFileObj, 'notes');
+          const fileUrl = await handleUpload(
+            fileList[0].originFileObj,
+            "notes"
+          );
           values.file = fileUrl; // Update the file URL with the uploaded file
         } catch (error) {
-          console.error('Error uploading file:', error);
-          message.error('Failed to upload file. Please try again.');
+          console.error("Error uploading file:", error);
+          message.error("Failed to upload file. Please try again.");
           return; // Don't proceed if file upload fails
         } finally {
           setIsUploading(false);
@@ -96,7 +110,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
         // If no new file was uploaded, keep the existing URL
         values.file = currentFileUrl;
       }
-      
+
       onSave({ ...values, id: note?.document_id });
       onCancel();
     } catch (error) {
@@ -104,11 +118,16 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
     }
   };
 
-  const handleFileChange = (info: { file: UploadFile; fileList: UploadFile[] }) => {
+  const handleFileChange = (info: {
+    file: UploadFile;
+    fileList: UploadFile[];
+  }) => {
     if (info.file) {
       // Only allow one file
       if (info.fileList.length > 1) {
-        message.warning('Only one file can be uploaded at a time. The previous file will be replaced.');
+        message.warning(
+          "Only one file can be uploaded at a time. The previous file will be replaced."
+        );
         // Keep only the last selected file
         const lastFile = info.fileList[info.fileList.length - 1];
         setFileList([lastFile]);
@@ -116,7 +135,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
         setFileList([info.file]);
       }
       // Clear the link input when a file is selected
-      form.setFieldsValue({ file: '' });
+      form.setFieldsValue({ file: "" });
       setCurrentFileUrl(null);
     }
   };
@@ -216,7 +235,9 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
             {
               validator: (_, value) => {
                 if (!value && fileList.length === 0 && !currentFileUrl) {
-                  return Promise.reject('Please add a PDF link or upload a file');
+                  return Promise.reject(
+                    "Please add a PDF link or upload a file"
+                  );
                 }
                 return Promise.resolve();
               },
@@ -240,13 +261,13 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
                   setCurrentFileUrl(e.target.value);
                 }
               }}
-              value={currentFileUrl || ''}
+              value={currentFileUrl || ""}
             />
 
-            <Upload 
+            <Upload
               beforeUpload={(file) => {
-                if (file.type !== 'application/pdf') {
-                  message.error('You can only upload PDF files!');
+                if (file.type !== "application/pdf") {
+                  message.error("You can only upload PDF files!");
                   return Upload.LIST_IGNORE;
                 }
                 const uploadFile: UploadFile = {
@@ -256,9 +277,9 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
                   type: file.type,
                   originFileObj: file,
                 };
-                handleFileChange({ 
-                  file: uploadFile, 
-                  fileList: [uploadFile] 
+                handleFileChange({
+                  file: uploadFile,
+                  fileList: [uploadFile],
                 });
                 return false;
               }}
@@ -280,7 +301,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
                 }}
                 disabled={isUploading}
               >
-                {isUploading ? 'Uploading...' : 'Upload PDF'}
+                {isUploading ? "Uploading..." : "Upload PDF"}
               </Button>
             </Upload>
           </div>
@@ -290,7 +311,15 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
             </div>
           ) : currentFileUrl ? (
             <div className="mt-2 text-sm text-gray-600">
-              Current file: <a href={currentFileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View file</a>
+              Current file:{" "}
+              <a
+                href={currentFileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                View file
+              </a>
             </div>
           ) : null}
         </Form.Item>

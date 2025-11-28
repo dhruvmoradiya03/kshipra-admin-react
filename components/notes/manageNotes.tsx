@@ -213,7 +213,7 @@ const ManageNotes = () => {
       subjectId: values.subject,
       topicId: values.topic,
       title: values.title,
-      file: values.pdfLink || null,
+      file: values.file || null,
     };
 
     try {
