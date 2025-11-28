@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Work_Sans } from "next/font/google";
 import { Dropdown, Space, Button } from "antd";
 import { DownOutlined, PlusOutlined } from "@ant-design/icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import FlashCardList from "./FlashCardList";
 import AddFlashCardModal from "./AddFlashCardModal";
 import EditFlashCardModal from "./EditFlashCardModal";
@@ -14,12 +14,12 @@ import "./flashcard.css";
 import {
   addFlashcard,
   deleteFlashcard,
-  getFlashcards,
   getFlashcardsBySubjectId,
   getFlashcardsByTopicId,
   updateFlashcard,
 } from "@/service/api/flashcard.api";
 import UploadFlashCardModal from "./UploadCardModal";
+import { debounce } from "lodash";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -36,20 +36,29 @@ const ManageFlashcards = () => {
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [currentFlashcard, setCurrentFlashcard] = useState<any>(null);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [loading, setLoading] = useState(false);
+
+  const [lastVisibleDocs, setLastVisibleDocs] = useState<
+    Record<number, any | null>
+  >({});
 
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
     total: 0,
-    lastVisible: null as any,
   });
 
   const fetchSubjects = async () => {
     try {
       const subjects = await getSubjects();
       setSubject(subjects);
+
+      // Select the first subject by default if there are subjects and none is selected
+      if (subjects.length > 0 && !selectedSubject) {
+        handleSubjectChange(subjects[0].document_id);
+      }
     } catch (error) {
       console.error("Error fetching subjects:", error);
     }
@@ -73,15 +82,61 @@ const ManageFlashcards = () => {
     }
   };
 
+  const debouncedSearch = useCallback(
+    debounce(async (value: string, page = 1, pageSize = 10) => {
+      try {
+        let result;
+        setLoading(true);
+        if (selectedSubject && selectedTopic) {
+          result = await getFlashcardsByTopicId(
+            selectedTopic,
+            page,
+            pageSize,
+            lastVisibleDocs,
+            value
+          );
+          console.log(result, "this is reult");
+        } else if (selectedSubject) {
+          result = await getFlashcardsBySubjectId(
+            selectedSubject,
+            page,
+            pageSize,
+            lastVisibleDocs,
+            value
+          );
+        } else {
+          return;
+        }
+
+        setFlashcardList(result.data);
+
+        setPagination({
+          page,
+          pageSize,
+          total: result.total,
+        });
+
+        // Cache cursor for next fetch
+        setLastVisibleDocs((prev) => ({
+          ...prev,
+          [page]: result.lastVisible,
+        }));
+      } catch (error) {
+        console.log(error);
+      } finally {
+        setLoading(false);
+      }
+    }, 500),
+    []
+  );
+
   const fetchFlashcards = async (
     page = pagination.page,
     pageSize = pagination.pageSize,
-    lastVisible = pagination.lastVisible
+    lastVisible = lastVisibleDocs
   ) => {
     try {
       setLoading(true);
-
-      console.log(page, pageSize, lastVisible);
       if (selectedSubject && selectedTopic) {
         const flashcards: any = await getFlashcardsByTopicId(
           selectedTopic,
@@ -95,7 +150,10 @@ const ManageFlashcards = () => {
           total: flashcards.total,
           page: flashcards.page,
           pageSize: flashcards.pageSize,
-          lastVisible: flashcards.lastVisible,
+        }));
+        setLastVisibleDocs((prev) => ({
+          ...prev,
+          [page]: flashcards.lastVisible,
         }));
       } else if (selectedSubject) {
         const flashcards: any = await getFlashcardsBySubjectId(
@@ -110,7 +168,10 @@ const ManageFlashcards = () => {
           total: flashcards.total,
           page: flashcards.page,
           pageSize: flashcards.pageSize,
-          lastVisible: flashcards.lastVisible,
+        }));
+        setLastVisibleDocs((prev) => ({
+          ...prev,
+          [page]: flashcards.lastVisible,
         }));
       } else {
         console.log("No flashcards found");
@@ -120,8 +181,8 @@ const ManageFlashcards = () => {
           total: 0,
           page: 1,
           pageSize: 10,
-          lastVisible: null,
         }));
+        setLastVisibleDocs({});
         return;
       }
     } catch (error) {
@@ -144,6 +205,12 @@ const ManageFlashcards = () => {
 
   // Handle subject change
   const handleSubjectChange = (subjectId: string) => {
+    setPagination({
+      page: 1,
+      pageSize: 10,
+      total: 0,
+    });
+    setLastVisibleDocs({});
     setSelectedSubject(subjectId);
     setSelectedTopic(null);
   };
@@ -167,29 +234,26 @@ const ManageFlashcards = () => {
       });
 
       console.log(response, "this is response");
+      setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error adding flashcard:", error);
     } finally {
       setLoading(false);
     }
 
-    setIsAddModalVisible(false);
+    fetchFlashcards(pagination.page, pagination.pageSize);
   };
 
   const handlePageChange = (page: number, pageSize?: number) => {
-    const resetLastVisible = page === 1 ? null : pagination.lastVisible;
-
     setPagination((prev) => ({
       ...prev,
       current: page,
       ...(pageSize && { pageSize }),
-      lastVisible: resetLastVisible,
     }));
     fetchFlashcards(page, pageSize);
   };
 
   const handleViewClick = (flashcard: any) => {
-    // In a real app, this would open the note in a viewer
     console.log("Viewing flashcard:", flashcard);
   };
 
@@ -201,13 +265,14 @@ const ManageFlashcards = () => {
       setLoading(true);
       const response = await updateFlashcard(values.id, values);
       console.log(response, "this is response");
+      setIsEditModalVisible(false);
     } catch (error) {
       console.error("Error updating flashcard:", error);
     } finally {
       setLoading(false);
     }
 
-    setIsEditModalVisible(false);
+    fetchFlashcards(pagination.page, pagination.pageSize);
     setCurrentFlashcard(null);
   };
 
@@ -224,13 +289,14 @@ const ManageFlashcards = () => {
       setLoading(true);
       const response = await deleteFlashcard(currentFlashcard?.id);
       console.log(response, "this is response");
+      setIsDeleteModalVisible(false);
     } catch (error) {
       console.error("Error deleting flashcard:", error);
     } finally {
       setLoading(false);
     }
 
-    setIsDeleteModalVisible(false);
+    fetchFlashcards(pagination.page, pagination.pageSize);
     setCurrentFlashcard(null);
   };
 
@@ -270,6 +336,11 @@ const ManageFlashcards = () => {
               type="text"
               className="pl-12 p-3 rounded-xl w-[350px] text-black"
               placeholder="Search For FlashCards"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSearch(e.target.value);
+              }}
             />
           </div>
         </div>

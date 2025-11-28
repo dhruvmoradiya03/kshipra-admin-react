@@ -108,60 +108,11 @@ export const deleteFlashcard = async (flashcardId: string) => {
   }
 };
 
-// Get flashcards with pagination
-export const getFlashcards = async (
-  page: number = 1,
-  pageSize: number = 10,
-  lastVisible: any = null
-) => {
-  try {
-    const flashcardsRef = collection(db, "flashcards");
-    let q = query(
-      flashcardsRef,
-      where("isDeleted", "==", false),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    if (lastVisible) {
-      q = query(
-        flashcardsRef,
-        where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
-        startAfter(lastVisible),
-        limit(pageSize)
-      );
-    }
-
-    const querySnapshot = await getDocs(q);
-    const flashcards = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Flashcard[];
-
-    const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-    const hasMore = querySnapshot.docs.length === pageSize;
-
-    return {
-      data: flashcards,
-      lastVisible: lastVisibleDoc,
-      hasMore,
-      total: flashcards.length,
-      page,
-      pageSize,
-    };
-  } catch (error) {
-    console.error("Error fetching flashcards:", error);
-    throw new Error("Failed to fetch flashcards");
-  }
-};
-
 // Get a single flashcard by ID
 export const getFlashcardById = async (flashcardId: string) => {
   try {
     const flashcardRef = doc(db, "flashcards", flashcardId);
     const flashcardSnap = await getDoc(flashcardRef);
-
     if (flashcardSnap.exists()) {
       return { id: flashcardSnap.id, ...flashcardSnap.data() } as Flashcard;
     } else {
@@ -178,11 +129,63 @@ export const getFlashcardsBySubjectId = async (
   subjectId: string,
   page: number = 1,
   pageSize: number = 10,
-  lastVisible: any = null
+  lastVisibleDocs: Record<number, any | null> = {},
+  searchQuery: string = ""
 ) => {
   try {
     const flashcardsRef = collection(db, "flashcards");
 
+    if (searchQuery && searchQuery.trim() !== "") {
+      const countQuery = query(
+        flashcardsRef,
+        where("subjectId", "==", subjectId),
+        where("isDeleted", "==", false),
+        where("question", ">=", searchQuery),
+        where("question", "<=", searchQuery + "\uf8ff")
+      );
+      const totalSnap = await getCountFromServer(countQuery);
+      const total = totalSnap.data().count;
+
+      let q;
+      if (page === 1 || !lastVisibleDocs[page - 1]) {
+        q = query(
+          flashcardsRef,
+          where("subjectId", "==", subjectId),
+          where("isDeleted", "==", false),
+          where("question", ">=", searchQuery),
+          where("question", "<=", searchQuery + "\uf8ff"),
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        );
+      } else {
+        q = query(
+          flashcardsRef,
+          where("subjectId", "==", subjectId),
+          where("isDeleted", "==", false),
+          where("question", ">=", searchQuery),
+          where("question", "<=", searchQuery + "\uf8ff"),
+          orderBy("createdAt", "desc"),
+          startAfter(lastVisibleDocs[page - 1]),
+          limit(pageSize)
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      const flashcards = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Flashcard[];
+
+      const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+
+      return {
+        data: flashcards,
+        lastVisible: newLastVisible,
+        total,
+        page,
+        pageSize,
+      };
+    }
     // Get total matching documents
     const countQuery = query(
       flashcardsRef,
@@ -192,23 +195,22 @@ export const getFlashcardsBySubjectId = async (
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
 
-    // Main paginated query
-    let q = query(
-      flashcardsRef,
-      where("subjectId", "==", subjectId),
-      where("isDeleted", "==", false),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    // If we have a cursor, apply it
-    if (lastVisible && page !== 1) {
+    let q;
+    if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         flashcardsRef,
         where("subjectId", "==", subjectId),
         where("isDeleted", "==", false),
         orderBy("createdAt", "desc"),
-        startAfter(lastVisible),
+        limit(pageSize)
+      );
+    } else {
+      q = query(
+        flashcardsRef,
+        where("subjectId", "==", subjectId),
+        where("isDeleted", "==", false),
+        orderBy("createdAt", "desc"),
+        startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );
     }
@@ -239,10 +241,63 @@ export const getFlashcardsByTopicId = async (
   topicId: string,
   page: number = 1,
   pageSize: number = 10,
-  lastVisible: any = null
+  lastVisibleDocs: Record<number, any | null> = {},
+  searchQuery: string = ""
 ) => {
   try {
     const flashcardsRef = collection(db, "flashcards");
+
+    if (searchQuery && searchQuery.trim() !== "") {
+      const countQuery = query(
+        flashcardsRef,
+        where("topicId", "==", topicId),
+        where("isDeleted", "==", false),
+        where("question", ">=", searchQuery),
+        where("question", "<=", searchQuery + "\uf8ff")
+      );
+      const totalSnap = await getCountFromServer(countQuery);
+      const total = totalSnap.data().count;
+
+      let q;
+      if (page === 1 || !lastVisibleDocs[page - 1]) {
+        q = query(
+          flashcardsRef,
+          where("topicId", "==", topicId),
+          where("isDeleted", "==", false),
+          where("question", ">=", searchQuery),
+          where("question", "<=", searchQuery + "\uf8ff"),
+          orderBy("createdAt", "desc"),
+          limit(pageSize)
+        );
+      } else {
+        q = query(
+          flashcardsRef,
+          where("topicId", "==", topicId),
+          where("isDeleted", "==", false),
+          where("question", ">=", searchQuery),
+          where("question", "<=", searchQuery + "\uf8ff"),
+          orderBy("createdAt", "desc"),
+          startAfter(lastVisibleDocs[page - 1]),
+          limit(pageSize)
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      const flashcards = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Flashcard[];
+
+      const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
+
+      return {
+        data: flashcards,
+        lastVisible: newLastVisible,
+        total,
+        page,
+        pageSize,
+      };
+    }
 
     // Get total matching documents
     const countQuery = query(
@@ -253,23 +308,22 @@ export const getFlashcardsByTopicId = async (
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
 
-    // Main paginated query
-    let q = query(
-      flashcardsRef,
-      where("topicId", "==", topicId),
-      where("isDeleted", "==", false),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    // If we have a cursor, apply it
-    if (lastVisible && page !== 1) {
+    let q;
+    if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         flashcardsRef,
         where("topicId", "==", topicId),
         where("isDeleted", "==", false),
         orderBy("createdAt", "desc"),
-        startAfter(lastVisible),
+        limit(pageSize)
+      );
+    } else {
+      q = query(
+        flashcardsRef,
+        where("topicId", "==", topicId),
+        where("isDeleted", "==", false),
+        orderBy("createdAt", "desc"),
+        startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );
     }

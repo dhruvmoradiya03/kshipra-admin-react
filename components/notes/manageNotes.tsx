@@ -5,7 +5,7 @@ import { Work_Sans } from "next/font/google";
 import type { MenuProps } from "antd";
 import { Dropdown, Space } from "antd";
 import { DownOutlined } from "@ant-design/icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import NotesList from "./NotesList";
 import AddNoteModal from "./AddNoteModal";
 import EditNoteModal from "./EditNoteModal";
@@ -19,6 +19,7 @@ import {
   updateNote,
 } from "@/service/api/notes.api";
 import { getSubjects, getTopics } from "@/service/api/config.api";
+import { debounce } from "lodash";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -35,19 +36,72 @@ const ManageNotes = () => {
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [currentNote, setCurrentNote] = useState<any | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  const [lastVisibleDocs, setLastVisibleDocs] = useState<
+    Record<number, any | null>
+  >({});
+
   const [loading, setLoading] = useState(false);
 
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
-    lastVisible: null as any,
   });
+
+  const debouncedSearch = useCallback(
+    debounce(async (value: string, page = 1, pageSize = 10) => {
+      try {
+        let result;
+        setLoading(true);
+        if (selectedSubject && selectedTopic) {
+          result = await getNotesByTopicId(
+            selectedTopic,
+            page,
+            pageSize,
+            lastVisibleDocs,
+            value
+          );
+          console.log(result, "this is reult");
+        } else if (selectedSubject) {
+          result = await getNotesBySubjectId(
+            selectedSubject,
+            page,
+            pageSize,
+            lastVisibleDocs,
+            value
+          );
+        } else {
+          return;
+        }
+
+        setNoteList(result.data);
+
+        setPagination({
+          current: page,
+          pageSize,
+          total: result.total,
+        });
+
+        // Cache cursor for next fetch
+        setLastVisibleDocs((prev) => ({
+          ...prev,
+          [page]: result.lastVisible,
+        }));
+      } catch (error) {
+        console.log(error);
+      } finally {
+        setLoading(false);
+      }
+    }, 500),
+    []
+  );
 
   const fetchNotes = async (
     page = pagination.current,
     pageSize = pagination.pageSize,
-    lastVisible = pagination.lastVisible
+    lastVisible = lastVisibleDocs
   ) => {
     try {
       setLoading(true);
@@ -81,7 +135,11 @@ const ManageNotes = () => {
         total: result.total,
         current: page,
         pageSize,
-        lastVisible: result.lastVisible,
+      }));
+
+      setLastVisibleDocs((prev) => ({
+        ...prev,
+        [page]: result.lastVisible,
       }));
     } catch (error) {
       console.error("Error fetching notes:", error);
@@ -124,16 +182,13 @@ const ManageNotes = () => {
 
   useEffect(() => {
     fetchNotes();
-  }, [selectedSubject, selectedTopic, pagination.pageSize, pagination.current]);
+  }, [selectedSubject, selectedTopic]);
 
   const handlePageChange = (page: number, pageSize?: number) => {
-    const resetLastVisible = page === 1 ? null : pagination.lastVisible;
-
     setPagination((prev) => ({
       ...prev,
       current: page,
       ...(pageSize && { pageSize }),
-      lastVisible: resetLastVisible,
     }));
     fetchNotes(page, pageSize);
   };
@@ -144,8 +199,9 @@ const ManageNotes = () => {
       current: 1,
       pageSize: 10,
       total: 0,
-      lastVisible: null,
     });
+
+    setLastVisibleDocs({});
 
     setSelectedSubject(subjectId);
     setSelectedTopic(null);
@@ -163,14 +219,14 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await addNote(newNote);
+      setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error adding note:", error);
     } finally {
       setLoading(false);
     }
 
-    fetchNotes(pagination.current, pagination.pageSize, null);
-    setIsAddModalVisible(false);
+    fetchNotes(pagination.current, pagination.pageSize);
   };
 
   const handleEditNote = async (values: any) => {
@@ -186,14 +242,15 @@ const ManageNotes = () => {
       const result = await updateNote(currentNote?.document_id, {
         ...updatedNote,
       });
+
+      setIsEditModalVisible(false);
     } catch (error) {
       console.error("Error updating note:", error);
     } finally {
       setLoading(false);
     }
 
-    fetchNotes(pagination.current, pagination.pageSize, null);
-    setIsEditModalVisible(false);
+    fetchNotes(pagination.current, pagination.pageSize);
     setCurrentNote(null);
   };
 
@@ -201,15 +258,15 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await deleteNote(currentNote?.document_id);
+      setIsDeleteModalVisible(false);
     } catch (error) {
       console.error("Error deleting note:", error);
     } finally {
       setLoading(false);
     }
 
-    fetchNotes(pagination.current, pagination.pageSize, null);
+    fetchNotes(pagination.current, pagination.pageSize);
 
-    setIsDeleteModalVisible(false);
     setCurrentNote(null);
   };
 
@@ -233,7 +290,12 @@ const ManageNotes = () => {
   return (
     <div className="flex flex-col px-6 py-4 bg-[#F5F6F7] h-full">
       <div className="h-[12%] w-full items-center justify-center flex ">
-        <div className="flex justify-between w-full py-4">
+        <div className="flex justify-between items-center w-full py-4">
+          <div
+            className={`text-[#1E4640] ${worksans.className} font-medium text-2xl`}
+          >
+            Notes Management
+          </div>
           <div className="relative rounded-xl shadow-[0px_0px_4px_0px_#1E464040]">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Image
@@ -247,27 +309,19 @@ const ManageNotes = () => {
               type="text"
               className="pl-12 p-3 rounded-xl w-[350px] text-black"
               placeholder="Search For Notes"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSearch(e.target.value);
+              }}
+              disabled={loading}
             />
-          </div>
-          <div className="relative shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
-            <Image src="/images/plus.svg" width={20} height={20} alt="plus" />
-            <button
-              className="text-[#1E4640] font-medium"
-              onClick={() => setIsAddModalVisible(true)}
-            >
-              Add Notes
-            </button>
           </div>
         </div>
       </div>
       <div className="h-[88%] w-full flex flex-col bg-white rounded-3xl overflow-hidden">
         <div className="h-[14%] w-full flex-shrink-0 px-5 py-4">
           <div className="h-full w-full flex justify-between items-center">
-            <div
-              className={`text-[#1E4640] ${worksans.className} font-medium text-2xl`}
-            >
-              Notes Management
-            </div>
             <div className="flex gap-2">
               <Dropdown
                 menu={{
@@ -305,8 +359,9 @@ const ManageNotes = () => {
                       current: 1,
                       pageSize: 10,
                       total: 0,
-                      lastVisible: null,
                     });
+
+                    setLastVisibleDocs({});
                     setSelectedTopic(e.key);
                   },
                 }}
@@ -331,6 +386,15 @@ const ManageNotes = () => {
                   <DownOutlined className="text-xs" />
                 </div>
               </Dropdown>
+            </div>
+            <div className="relative h-full shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
+              <Image src="/images/plus.svg" width={20} height={20} alt="plus" />
+              <button
+                className="text-[#1E4640] font-medium"
+                onClick={() => setIsAddModalVisible(true)}
+              >
+                Add Notes
+              </button>
             </div>
           </div>
         </div>

@@ -40,10 +40,14 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
     fetchTopics();
   }, [selectedSubject]);
 
+  // Reset form and clear validation errors when modal is opened
   useEffect(() => {
-    setSelectedSubject(null);
-    setTopic([]);
-  }, []);
+    if (visible) {
+      form.resetFields();
+      setSelectedSubject(null);
+      setTopic([]);
+    }
+  }, [visible]);
 
   const handleSubmit = () => {
     form
@@ -53,8 +57,6 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
         onSave(values);
       })
       .catch(() => {});
-
-    onCancel();
   };
 
   return (

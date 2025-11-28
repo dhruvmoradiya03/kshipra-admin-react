@@ -133,13 +133,25 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
     }
   }, [selectedTopic]);
 
+  // Reset form and clear validation errors when modal is opened
   useEffect(() => {
-    setSelectedSubject(null);
-    setSelectedTopic(null);
-    setTopic([]);
-    setNotes([]);
+    if (visible) {
+      form.resetFields();
+      setSelectedSubject(null);
+      setSelectedTopic(null);
+      setTopic([]);
+      setNotes([]);
+      setPagination({
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        lastVisible: null,
+      });
+    }
+  }, [visible]);
 
-    // Cleanup debounce on unmount
+  // Cleanup debounce on unmount
+  useEffect(() => {
     return () => {
       debouncedFetchNotes.cancel();
     };
@@ -153,8 +165,6 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         onSave(values);
       })
       .catch(() => {});
-
-    onCancel();
   };
 
   return (

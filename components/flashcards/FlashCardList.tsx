@@ -206,21 +206,22 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
         loading={loading}
         className="notes-table hide-scrollbar"
         rowClassName={() => "notes-table-row"}
-        // style={{
-        //   width: "100%",
-        // }}
-        // scroll={{
-        //   y: "52vh",
-        //   x: "max-content",
-        // }}
+        style={{
+          width: "100%",
+        }}
+        scroll={{
+          y: "52vh",
+          x: "max-content",
+        }}
         pagination={{
-          current: pagination.current,
+          current: pagination.page,
           pageSize: pagination.pageSize,
           total: pagination.total,
           showSizeChanger: true,
           showTotal: (total) => `Total ${total} items`,
           onChange: onPageChange,
-          onShowSizeChange: (page, pageSize) => onPageChange?.(page, pageSize),
+          onShowSizeChange: (current, pageSize) =>
+            onPageChange?.(current, pageSize),
         }}
       />
     </div>
