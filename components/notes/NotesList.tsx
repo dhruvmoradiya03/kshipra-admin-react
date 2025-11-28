@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Space, Button, Tag, Typography } from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { Note } from "./types";
+import { Note } from "@/service/api/notes.api";
+import { getFlashcardCountByNoteId } from "@/service/api/flashcard.api";
 import "./notes.css";
 
 const { Text } = Typography;
@@ -29,6 +30,30 @@ const NotesList: React.FC<NotesListProps> = ({
   pageSize = 10,
   onPageChange = () => {},
 }) => {
+  const [flashcardCounts, setFlashcardCounts] = useState<
+    Record<string, number>
+  >({});
+
+  // Fetch flashcard counts for all notes
+  useEffect(() => {
+    const fetchFlashcardCounts = async () => {
+      const counts: Record<string, number> = {};
+
+      for (const note of notes) {
+        if (note.id) {
+          const count = await getFlashcardCountByNoteId(note.id);
+          counts[note.id] = count;
+        }
+      }
+
+      setFlashcardCounts(counts);
+    };
+
+    if (notes.length > 0) {
+      fetchFlashcardCounts();
+    }
+  }, [notes]);
+
   const columns = [
     {
       title: "Note Title",
@@ -104,7 +129,10 @@ const NotesList: React.FC<NotesListProps> = ({
     {
       title: "FlashCards",
       key: "flashcards",
-      render: () => "No FlashCards",
+      render: (_: any, record: Note) => {
+        const count = record.id ? flashcardCounts[record.id] || 0 : 0;
+        return `Flashcards Link (${count})`;
+      },
     },
     {
       title: "Actions",

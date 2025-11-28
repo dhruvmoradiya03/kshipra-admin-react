@@ -237,6 +237,25 @@ export const getFlashcardsBySubjectId = async (
 };
 
 // Get flashcards by topic ID
+// Get count of flashcards by noteId
+export const getFlashcardCountByNoteId = async (noteId: string): Promise<number> => {
+  try {
+    if (!noteId) return 0;
+    
+    const q = query(
+      collection(db, 'flashcards'),
+      where('noteId', '==', noteId),
+      where('isDeleted', '==', false)
+    );
+    
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('Error counting flashcards:', error);
+    return 0;
+  }
+};
+
 export const getFlashcardsByTopicId = async (
   topicId: string,
   page: number = 1,
