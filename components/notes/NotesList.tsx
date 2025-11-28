@@ -65,9 +65,22 @@ const NotesList: React.FC<NotesListProps> = ({
           }
         };
 
-        console.log("text", text);
-
         const displayText = text ? getFileNameFromUrl(text) : "No file";
+
+        // If there's a file, make it a clickable link
+        if (text) {
+          return (
+            <a
+              href={text}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#1890ff" }}
+              onClick={(e) => e.stopPropagation()} // Prevent row click event
+            >
+              {displayText}
+            </a>
+          );
+        }
 
         return (
           <Text
