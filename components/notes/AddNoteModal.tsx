@@ -1,9 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Input, Upload, Button, Form, Row, Col, Select } from "antd";
+import {
+  Modal,
+  Input,
+  Upload,
+  Button,
+  Form,
+  Row,
+  Col,
+  Select,
+  message,
+  UploadFile,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { Subject, Topic } from "./types";
 import { Work_Sans } from "next/font/google";
-import { getTopics } from "@/service/api/config.api";
+import { getTopics, handleUpload } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -25,6 +36,8 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
   const [form] = Form.useForm();
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [topic, setTopic] = useState<any>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchTopics = async () => {
     try {
@@ -49,14 +62,55 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
     }
   }, [visible]);
 
-  const handleSubmit = () => {
-    form
-      .validateFields()
-      .then((values) => {
-        form.resetFields();
-        onSave(values);
-      })
-      .catch(() => {});
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+
+      // If there's a file to upload, upload it first
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        setIsUploading(true);
+        try {
+          const fileUrl = await handleUpload(
+            fileList[0].originFileObj,
+            "notes"
+          );
+          values.file = fileUrl; // Update the file URL with the uploaded file
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          message.error("Failed to upload file. Please try again.");
+          return; // Don't proceed if file upload fails
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
+      form.resetFields();
+      setFileList([]);
+      onSave(values);
+    } catch (error) {
+      console.error("Form validation failed:", error);
+    }
+  };
+
+  const handleFileChange = (info: {
+    file: UploadFile;
+    fileList: UploadFile[];
+  }) => {
+    if (info.file) {
+      // Only allow one file
+      if (info.fileList.length > 1) {
+        message.warning(
+          "Only one file can be uploaded at a time. The previous file will be replaced."
+        );
+        // Keep only the last selected file
+        const lastFile = info.fileList[info.fileList.length - 1];
+        setFileList([lastFile]);
+      } else {
+        setFileList([info.file]);
+      }
+      // Clear the link input when a file is selected
+      form.setFieldsValue({ pdfLink: "" });
+    }
   };
 
   return (
@@ -132,22 +186,55 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
         {/* FILE LINK + UPLOAD BUTTON */}
         <Form.Item
           name="pdfLink"
-          label="Add PDF File Link"
-          rules={[{ required: true, message: "Add Link" }]}
+          label="PDF File (Link or Upload)"
+          rules={[
+            {
+              validator: (_, value) => {
+                if (!value && fileList.length === 0) {
+                  return Promise.reject(
+                    "Please add a PDF link or upload a file"
+                  );
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <div className="flex gap-3">
             <Input
-              placeholder="Add Link"
+              placeholder="Or paste PDF link here"
               style={{
                 height: 45,
                 borderRadius: 8,
                 fontFamily: "Work Sans",
                 fontWeight: 400,
               }}
+              disabled={fileList.length > 0}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setFileList([]); // Clear file list when typing in the link
+                }
+              }}
             />
 
-            <Upload beforeUpload={() => false} showUploadList={false}>
+            <Upload
+              beforeUpload={(file) => {
+                if (file.type !== "application/pdf") {
+                  message.error("You can only upload PDF files!");
+                  return Upload.LIST_IGNORE;
+                }
+                handleFileChange({ file, fileList: [file] });
+                return false;
+              }}
+              fileList={fileList}
+              onRemove={() => {
+                setFileList([]);
+                return true;
+              }}
+              maxCount={1}
+              accept=".pdf"
+            >
               <Button
                 icon={<UploadOutlined />}
                 style={{
@@ -156,11 +243,17 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
                   paddingInline: 20,
                   fontFamily: "Work Sans",
                 }}
+                disabled={isUploading}
               >
-                Upload
+                {isUploading ? "Uploading..." : "Upload PDF"}
               </Button>
             </Upload>
           </div>
+          {fileList.length > 0 && (
+            <div className="mt-2 text-sm text-gray-600">
+              Selected file: {fileList[0].name}
+            </div>
+          )}
         </Form.Item>
 
         {/* FOOTER BUTTONS */}

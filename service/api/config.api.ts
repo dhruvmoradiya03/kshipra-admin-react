@@ -7,6 +7,8 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
+import { getStorage } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface Subject {
   id?: string;
@@ -22,6 +24,38 @@ interface Topic {
   createdAt: any;
   updatedAt: any;
 }
+
+export const handleUpload = async (
+  file: File,
+  folderName: string = "notes"
+) => {
+  const storage = getStorage();
+
+  // Get original filename and extension
+  const originalName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+
+  // Create a unique filename with original name and timestamp
+  const timestamp = Date.now();
+  const newFileName = `${originalName}.${fileExtension}`;
+
+  // Create storage reference with the new filename
+  const storageRef = ref(storage, `uploads/${folderName}/${newFileName}`);
+
+  try {
+    // Check if the file is a PDF
+    if (file.type !== "application/pdf") {
+      throw new Error("Only PDF files are allowed");
+    }
+
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
+};
 
 export const getSubjects = async () => {
   try {

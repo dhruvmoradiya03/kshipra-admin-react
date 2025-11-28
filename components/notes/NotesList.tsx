@@ -44,14 +44,49 @@ const NotesList: React.FC<NotesListProps> = ({
       title: "PDF File",
       dataIndex: "file",
       key: "file",
-      render: (text: string, record: Note) => (
-        <Text
-          style={{ cursor: "pointer", color: "#1890ff" }}
-          onClick={() => onView(record)}
-        >
-          {text}
-        </Text>
-      ),
+      render: (text: string, record: Note) => {
+        // Extract filename from path (assuming format: '.../notes/filename.ext')
+        const getFileNameFromUrl = (url: string) => {
+          try {
+            // Strip query params/hashes
+            const cleanUrl = url.split(/[?#]/)[0];
+
+            // Decode entire URL first (turns %2F into real '/')
+            const decoded = decodeURIComponent(cleanUrl);
+
+            // Now split by slash and get the last part
+            const parts = decoded.split("/");
+            const filename = parts[parts.length - 1];
+
+            return filename || "View PDF";
+          } catch (e) {
+            console.error("Error parsing filename:", e);
+            return "View PDF";
+          }
+        };
+
+        console.log("text", text);
+
+        const displayText = text ? getFileNameFromUrl(text) : "No file";
+
+        return (
+          <Text
+            style={{
+              cursor: "pointer",
+              color: "#1890ff",
+              maxWidth: 200,
+              display: "inline-block",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            onClick={() => onView(record)}
+            title={displayText}
+          >
+            {displayText}
+          </Text>
+        );
+      },
     },
     {
       title: "FlashCards",
