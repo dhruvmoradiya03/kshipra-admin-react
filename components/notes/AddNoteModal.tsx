@@ -66,45 +66,52 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      let fileUrl = "";
 
-      // If there's a file to upload, upload it first
-      if (fileList.length > 0) {
+      // Handle file upload or use direct link
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        // If file is selected, upload it
         const file = fileList[0].originFileObj as File;
         if (!file) {
           message.error("No file selected or invalid file");
           return;
         }
-        
+
         setIsUploading(true);
         try {
           console.log("Uploading file:", file);
-          const fileUrl = await handleUpload(file, "notes");
+          fileUrl = await handleUpload(file, "notes");
           console.log("File uploaded successfully. URL:", fileUrl);
-          values.file = fileUrl; // Update the file URL with the uploaded file
         } catch (error) {
           console.error("Error uploading file:", error);
           message.error("Failed to upload file. Please try again.");
-          return; // Don't proceed if file upload fails
+          return;
         } finally {
           setIsUploading(false);
         }
-      } else if (values.file) {
-        // If no file was uploaded but there's a direct link, use that
-        values.file = values.file.trim();
+      } else if (currentFileUrl) {
+        // If no file but there's a direct link, use that
+        fileUrl = currentFileUrl.trim();
       } else {
         message.error("Please provide either a file or a link");
         return;
       }
 
+      // Update values with the file URL and save
+      values.file = fileUrl;
+
+      // Reset form and call onSave
       form.resetFields();
       setFileList([]);
+      setCurrentFileUrl("");
       onSave(values);
-    } catch (error) {
-      console.error("Form validation failed:", error);
+    } catch (error: any) {
+      console.error("Form submission failed:", error);
+      if (!error.message.includes("Please provide either a file or a link")) {
+        message.error("Failed to save note. Please try again.");
+      }
     }
   };
-
-  // This function is no longer needed as we're handling the file list directly in the Upload component
 
   return (
     <Modal
@@ -203,28 +210,31 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
                 fontFamily: "Work Sans",
                 fontWeight: 400,
               }}
-              disabled={fileList.length > 0}
               value={currentFileUrl || ""}
               onChange={(e) => {
-                if (e.target.value) {
-                  setFileList([]); // Clear file list when typing in the link
+                const value = e.target.value;
+                setCurrentFileUrl(value);
+                // If user starts typing, clear any selected files
+                if (value) {
+                  setFileList([]);
                 }
               }}
             />
 
             <Upload
               beforeUpload={(file) => {
-                // Always return false to prevent automatic upload
-                return false;
+                if (file.type !== "application/pdf") {
+                  message.error("You can only upload PDF files!");
+                  return Upload.LIST_IGNORE;
+                }
+                return false; // Prevent automatic upload
               }}
               fileList={fileList}
-              onChange={(info) => {
-                if (info.fileList.length > 1) {
-                  // If more than one file, keep only the last one
-                  const lastFile = info.fileList[info.fileList.length - 1];
-                  setFileList([lastFile]);
-                } else {
-                  setFileList(info.fileList);
+              onChange={({ fileList: newFileList }) => {
+                // Update file list and clear any direct link when a file is selected
+                setFileList(newFileList);
+                if (newFileList.length > 0) {
+                  setCurrentFileUrl("");
                 }
               }}
               onRemove={() => {

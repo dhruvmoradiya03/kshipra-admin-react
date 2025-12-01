@@ -5,7 +5,7 @@ import { Work_Sans } from "next/font/google";
 import type { MenuProps } from "antd";
 import { Dropdown, Space } from "antd";
 import { DownOutlined } from "@ant-design/icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import NotesList from "./NotesList";
 import AddNoteModal from "./AddNoteModal";
 import EditNoteModal from "./EditNoteModal";
@@ -20,6 +20,8 @@ import {
 } from "@/service/api/notes.api";
 import { getSubjects, getTopics } from "@/service/api/config.api";
 import { debounce } from "lodash";
+import SuccessAlert from "@/components/alerts/SuccessAlert";
+import ErrorAlert from "@/components/alerts/ErrorAlert";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -30,6 +32,9 @@ const ManageNotes = () => {
   const [selectedTopic, setSelectedTopic] = useState<any>(null);
 
   const [noteList, setNoteList] = useState<any>([]);
+
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -43,6 +48,9 @@ const ManageNotes = () => {
   >({});
 
   const [loading, setLoading] = useState(false);
+
+  const [isSuccessAlertOpen, setIsSuccessAlertOpen] = useState(false);
+  const [isErrorAlertOpen, setIsErrorAlertOpen] = useState(false);
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -219,9 +227,19 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await addNote(newNote);
+      setSuccessMessage("Note added successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error adding note:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to add note.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -243,9 +261,19 @@ const ManageNotes = () => {
         ...updatedNote,
       });
 
+      setSuccessMessage("Note updated successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsEditModalVisible(false);
     } catch (error) {
       console.error("Error updating note:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update note.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -258,9 +286,19 @@ const ManageNotes = () => {
     try {
       setLoading(true);
       const result = await deleteNote(currentNote?.document_id);
+      setSuccessMessage("Note deleted successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsDeleteModalVisible(false);
     } catch (error) {
       console.error("Error deleting note:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to delete note.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -287,8 +325,40 @@ const ManageNotes = () => {
 
   console.log(currentNote, "currentNote");
 
+  const handleSuccessAlertClose = (
+    event?: SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") return;
+    setIsSuccessAlertOpen(false);
+    setSuccessMessage(null);
+  };
+
+  const handleErrorAlertClose = (
+    event?: SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") return;
+    setIsErrorAlertOpen(false);
+    setErrorMessage(null);
+  };
+
   return (
     <div className="flex flex-col px-6 py-4 bg-[#F5F6F7] h-full">
+      {successMessage && (
+        <SuccessAlert
+          message={successMessage}
+          open={isSuccessAlertOpen}
+          onClose={handleSuccessAlertClose}
+        />
+      )}
+      {errorMessage && (
+        <ErrorAlert
+          message={errorMessage}
+          open={isErrorAlertOpen}
+          onClose={handleErrorAlertClose}
+        />
+      )}
       <div className="h-[12%] w-full items-center justify-center flex ">
         <div className="flex justify-between items-center w-full py-4">
           <div
@@ -420,7 +490,7 @@ const ManageNotes = () => {
 
           {selectedSubject !== null &&
             (noteList.length > 0 ? (
-              <div className="w-full">
+              <div className="w-full mt-4">
                 <NotesList
                   notes={noteList}
                   onEdit={handleEditClick}

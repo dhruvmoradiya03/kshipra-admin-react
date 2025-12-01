@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Work_Sans } from "next/font/google";
 import { Dropdown, Space, Button } from "antd";
 import { DownOutlined, PlusOutlined } from "@ant-design/icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import FlashCardList from "./FlashCardList";
 import AddFlashCardModal from "./AddFlashCardModal";
 import EditFlashCardModal from "./EditFlashCardModal";
@@ -20,6 +20,8 @@ import {
 } from "@/service/api/flashcard.api";
 import UploadFlashCardModal from "./UploadCardModal";
 import { debounce } from "lodash";
+import SuccessAlert from "@/components/alerts/SuccessAlert";
+import ErrorAlert from "@/components/alerts/ErrorAlert";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -39,6 +41,11 @@ const ManageFlashcards = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [loading, setLoading] = useState(false);
+
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSuccessAlertOpen, setIsSuccessAlertOpen] = useState(false);
+  const [isErrorAlertOpen, setIsErrorAlertOpen] = useState(false);
 
   const [lastVisibleDocs, setLastVisibleDocs] = useState<
     Record<number, any | null>
@@ -234,9 +241,19 @@ const ManageFlashcards = () => {
       });
 
       console.log(response, "this is response");
+      setSuccessMessage("Flashcard added successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error adding flashcard:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to add flashcard.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -265,9 +282,19 @@ const ManageFlashcards = () => {
       setLoading(true);
       const response = await updateFlashcard(values.id, values);
       console.log(response, "this is response");
+      setSuccessMessage("Flashcard updated successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsEditModalVisible(false);
     } catch (error) {
       console.error("Error updating flashcard:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update flashcard.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -289,9 +316,19 @@ const ManageFlashcards = () => {
       setLoading(true);
       const response = await deleteFlashcard(currentFlashcard?.id);
       console.log(response, "this is response");
+      setSuccessMessage("Flashcard deleted successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
       setIsDeleteModalVisible(false);
     } catch (error) {
       console.error("Error deleting flashcard:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to delete flashcard.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -312,10 +349,42 @@ const ManageFlashcards = () => {
     setIsDeleteModalVisible(true);
   };
 
+  const handleSuccessAlertClose = (
+    event?: SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") return;
+    setIsSuccessAlertOpen(false);
+    setSuccessMessage(null);
+  };
+
+  const handleErrorAlertClose = (
+    event?: SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === "clickaway") return;
+    setIsErrorAlertOpen(false);
+    setErrorMessage(null);
+  };
+
   return (
     <div
       className={`flex flex-col px-6 py-4 bg-[#F5F6F7] h-full ${worksans.className}`}
     >
+      {successMessage && (
+        <SuccessAlert
+          message={successMessage}
+          open={isSuccessAlertOpen}
+          onClose={handleSuccessAlertClose}
+        />
+      )}
+      {errorMessage && (
+        <ErrorAlert
+          message={errorMessage}
+          open={isErrorAlertOpen}
+          onClose={handleErrorAlertClose}
+        />
+      )}
       <div className="h-[12%] w-full items-center justify-center flex ">
         <div className="flex justify-between w-full items-center">
           <div
@@ -455,7 +524,7 @@ const ManageFlashcards = () => {
 
           {selectedSubject !== null &&
             (flashcardList.length > 0 ? (
-              <div className="w-full">
+              <div className="w-full mt-4">
                 <FlashCardList
                   flashcards={flashcardList}
                   onEdit={handleEditClick}
