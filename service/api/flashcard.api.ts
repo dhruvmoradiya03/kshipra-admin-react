@@ -14,6 +14,8 @@ import {
   getCountFromServer,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
+import { getStorage, ref, uploadBytes } from "firebase/storage";
+import * as XLSX from "xlsx";
 
 export interface Flashcard {
   id?: string;
@@ -69,6 +71,160 @@ export const addFlashcard = async (
     console.error("Error adding flashcard:", error);
     throw new Error("Failed to add flashcard");
   }
+};
+
+const normalize = (value: unknown): string => String(value ?? "").trim();
+const normalizeKey = (value: unknown): string => normalize(value).toLowerCase();
+
+const REQUIRED_HEADERS = ["note title", "question", "answer", "category"];
+
+interface BulkUploadResult {
+  totalCount: number;
+  successCount: number;
+  skippedCount: number;
+  storagePath: string;
+}
+
+export const uploadFlashcardsFromExcel = async (
+  file: File | Blob,
+  options: { subjectId: string; topicId: string }
+): Promise<BulkUploadResult> => {
+  if (!file) {
+    throw new Error("No file provided for upload.");
+  }
+
+  const { subjectId, topicId } = options;
+
+  if (!subjectId || !topicId) {
+    throw new Error("Subject and topic must be selected before uploading.");
+  }
+
+  const storage = getStorage();
+  const timestamp = Date.now();
+  const originalName = (file as File).name ?? "flashcards.xlsx";
+  const sanitizedName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const storageRef = ref(
+    storage,
+    `uploads/flashcards/${timestamp}-${sanitizedName}`
+  );
+
+  await uploadBytes(storageRef, file);
+
+  const arrayBuffer =
+    "arrayBuffer" in file
+      ? await (file as File).arrayBuffer()
+      : await new Response(file).arrayBuffer();
+
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  if (!worksheet) {
+    throw new Error("The uploaded Excel file does not contain any worksheets.");
+  }
+
+  const rows = XLSX.utils.sheet_to_json<(string | undefined)[]>(worksheet, {
+    header: 1,
+    blankrows: false,
+  });
+
+  if (rows.length === 0) {
+    throw new Error("The uploaded Excel sheet is empty.");
+  }
+
+  const headerRow =
+    (rows[0] as (string | undefined)[] | undefined)?.map(
+      (cell: string | undefined) => normalize(cell).toLowerCase()
+    ) ?? [];
+  const headerValid = REQUIRED_HEADERS.every(
+    (header, index) => headerRow[index] === header
+  );
+
+  if (!headerValid) {
+    throw new Error(
+      "Invalid Excel template. Ensure the first row contains the columns: Note title, Question, Answer, Category."
+    );
+  }
+
+  const dataRows = rows
+    .slice(1)
+    .map((row: (string | undefined)[]) => row)
+    .filter((row: (string | undefined)[]) =>
+      row.some((cell: string | undefined) => normalize(cell).length > 0)
+    );
+
+  if (dataRows.length === 0) {
+    throw new Error("No data rows found in the uploaded Excel sheet.");
+  }
+
+  const notesSnapshot = await getDocs(
+    query(
+      collection(db, "notes"),
+      where("subjectId", "==", subjectId),
+      where("topicId", "==", topicId),
+      where("isDeleted", "==", false)
+    )
+  );
+
+  const noteMap = new Map<string, { id: string; title: string }>();
+  notesSnapshot.forEach((noteDoc) => {
+    const data = noteDoc.data() as { title?: string };
+    const normalizedTitle = normalize(data.title);
+    noteMap.set(normalizeKey(normalizedTitle), {
+      id: noteDoc.id,
+      title: normalizedTitle,
+    });
+  });
+
+  let successCount = 0;
+
+  for (const row of dataRows) {
+    const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
+      normalize(row[index])
+    );
+    const [noteTitle, question, answer, category] = normalizedCells;
+
+    if (!noteTitle || !question || !answer || !category) {
+      continue;
+    }
+
+    const note = noteMap.get(normalizeKey(noteTitle));
+    if (!note) {
+      continue;
+    }
+
+    try {
+      const timestamp = serverTimestamp();
+      const docRef = await addDoc(collection(db, "flashcards"), {
+        subjectId,
+        topicId,
+        noteId: note.id,
+        question,
+        answer,
+        category,
+        isDeleted: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      await updateDoc(docRef, {
+        document_id: docRef.id,
+      });
+
+      successCount += 1;
+    } catch (error) {
+      console.error("Failed to import flashcard row:", error);
+    }
+  }
+
+  const totalCount = dataRows.length;
+  const skippedCount = totalCount - successCount;
+
+  return {
+    totalCount,
+    successCount,
+    skippedCount,
+    storagePath: storageRef.fullPath,
+  };
 };
 
 // Update a flashcard
@@ -238,20 +394,22 @@ export const getFlashcardsBySubjectId = async (
 
 // Get flashcards by topic ID
 // Get count of flashcards by noteId
-export const getFlashcardCountByNoteId = async (noteId: string): Promise<number> => {
+export const getFlashcardCountByNoteId = async (
+  noteId: string
+): Promise<number> => {
   try {
     if (!noteId) return 0;
-    
+
     const q = query(
-      collection(db, 'flashcards'),
-      where('noteId', '==', noteId),
-      where('isDeleted', '==', false)
+      collection(db, "flashcards"),
+      where("noteId", "==", noteId),
+      where("isDeleted", "==", false)
     );
-    
+
     const snapshot = await getCountFromServer(q);
     return snapshot.data().count;
   } catch (error) {
-    console.error('Error counting flashcards:', error);
+    console.error("Error counting flashcards:", error);
     return 0;
   }
 };

@@ -17,6 +17,7 @@ import {
   getFlashcardsBySubjectId,
   getFlashcardsByTopicId,
   updateFlashcard,
+  uploadFlashcardsFromExcel,
 } from "@/service/api/flashcard.api";
 import UploadFlashCardModal from "./UploadCardModal";
 import { debounce } from "lodash";
@@ -303,9 +304,43 @@ const ManageFlashcards = () => {
     setCurrentFlashcard(null);
   };
 
-  const handleUploadFlashcard = (values: any) => {
-    console.log(values, "this is values");
-    setIsUploadModalVisible(false);
+  const handleUploadFlashcard = async (values: any) => {
+    if (!values?.file) {
+      setErrorMessage("Please provide an Excel file to upload.");
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { successCount, totalCount, skippedCount } =
+        await uploadFlashcardsFromExcel(values.file, {
+          subjectId: values.subject,
+          topicId: values.topic,
+        });
+
+      setSuccessMessage(
+        `Flashcard upload completed. Imported ${successCount} of ${totalCount} records (skipped ${skippedCount}).`
+      );
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsErrorAlertOpen(false);
+      setIsUploadModalVisible(false);
+      fetchFlashcards(pagination.page, pagination.pageSize);
+    } catch (error) {
+      console.error("Error uploading flashcards:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to upload flashcards from Excel.";
+      setErrorMessage(message);
+      setSuccessMessage(null);
+      setIsErrorAlertOpen(true);
+      setIsSuccessAlertOpen(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle delete flashcard

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Modal, Form, Input, Select, Button, Col, Row, Spin } from "antd";
+import { Modal, Form, Select, Button, Col, Row, Upload } from "antd";
 import { Work_Sans } from "next/font/google";
 import { getTopics } from "@/service/api/config.api";
+import { InboxOutlined } from "@ant-design/icons";
+import type { UploadFile, UploadProps } from "antd";
+import Image from "next/image";
 
 interface Subject {
   id: string;
@@ -35,6 +38,7 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
   const [form] = Form.useForm();
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [topic, setTopic] = useState<any>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
 
   const fetchTopics = async () => {
     try {
@@ -50,16 +54,41 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
     fetchTopics();
   }, [selectedSubject]);
 
-  const handleSubmit = () => {
-    form
-      .validateFields()
-      .then((values) => {
-        form.resetFields();
-        onSave(values);
-      })
-      .catch(() => {});
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      const payload = {
+        ...values,
+        file: fileList[0]?.originFileObj || fileList[0],
+      };
 
-    onCancel();
+      await onSave(payload);
+      form.resetFields();
+      setFileList([]);
+      onCancel();
+    } catch (error: any) {
+      // Ignore Ant Design validation errors
+      if (error?.errorFields) {
+        return;
+      }
+      console.error("Error submitting upload form:", error);
+    }
+  };
+
+  const uploadProps: UploadProps = {
+    multiple: false,
+    accept: ".xlsx,.xls",
+    beforeUpload: (file) => {
+      setFileList([file]);
+      form.setFieldsValue({ file });
+      return false;
+    },
+    onRemove: () => {
+      setFileList([]);
+      form.setFieldsValue({ file: undefined });
+    },
+    fileList,
+    itemRender: () => null,
   };
 
   return (
@@ -116,22 +145,58 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
         </Row>
 
         <Form.Item
-          name="question"
-          label="Question"
-          rules={[{ required: true, message: "Add Question" }]}
+          name="file"
+          label="Upload Excel File"
           className={`font-medium text-[#1E4640] ${worksans.className}`}
+          rules={[
+            {
+              validator: () => {
+                if (fileList.length > 0) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(
+                  new Error("Please upload an Excel file (.xlsx or .xls).")
+                );
+              },
+            },
+          ]}
         >
-          <div className="flex gap-3">
-            <Input
-              placeholder="Add Question"
-              style={{
-                height: 45,
-                borderRadius: 8,
-                fontFamily: "Work Sans",
-                fontWeight: 400,
-              }}
-            />
-          </div>
+          <Upload.Dragger {...uploadProps}>
+            <div className="flex flex-col items-center justify-center gap-3 py-10">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#1E4640]/10 text-[#1E4640]">
+                <Image
+                  src="/images/upload-button.svg"
+                  alt="Upload icon"
+                  width={32}
+                  height={32}
+                />
+              </div>
+              <p className="text-[#1E4640] font-semibold text-base text-center">
+                Drag and Drop Your File here, or click to browse
+              </p>
+              <Button
+                type="primary"
+                style={{
+                  backgroundColor: "#0B5447",
+                  borderRadius: 8,
+                  border: "none",
+                  padding: "6px 24px",
+                  fontFamily: "Work Sans",
+                }}
+              >
+                Upload File
+              </Button>
+              {fileList.length > 0 && (
+                <p className="text-[#1E4640] text-sm mt-2">
+                  Selected File:{" "}
+                  <span className="font-medium">{fileList[0].name}</span>
+                </p>
+              )}
+              <p className="text-[#758382] text-xs text-center">
+                Supported formats: .xlsx, .xls
+              </p>
+            </div>
+          </Upload.Dragger>
         </Form.Item>
 
         {/* FOOTER BUTTONS */}
