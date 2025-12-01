@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Work_Sans } from "next/font/google";
 import { Dropdown, Space, Button } from "antd";
 import { DownOutlined, PlusOutlined } from "@ant-design/icons";
-import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import FlashCardList from "./FlashCardList";
 import AddFlashCardModal from "./AddFlashCardModal";
 import EditFlashCardModal from "./EditFlashCardModal";
@@ -90,53 +90,61 @@ const ManageFlashcards = () => {
     }
   };
 
-  const debouncedSearch = useCallback(
-    debounce(async (value: string, page = 1, pageSize = 10) => {
-      try {
-        let result;
-        setLoading(true);
-        if (selectedSubject && selectedTopic) {
-          result = await getFlashcardsByTopicId(
-            selectedTopic,
-            page,
-            pageSize,
-            lastVisibleDocs,
-            value
-          );
-          console.log(result, "this is reult");
-        } else if (selectedSubject) {
-          result = await getFlashcardsBySubjectId(
-            selectedSubject,
-            page,
-            pageSize,
-            lastVisibleDocs,
-            value
-          );
-        } else {
+  const debouncedSearch = useMemo(
+    () =>
+      debounce(async (value: string, page = 1, pageSize = 10) => {
+        if (!selectedSubject) {
           return;
         }
 
-        setFlashcardList(result.data);
+        try {
+          setLoading(true);
+          let result;
 
-        setPagination({
-          page,
-          pageSize,
-          total: result.total,
-        });
+          if (selectedTopic) {
+            result = await getFlashcardsByTopicId(
+              selectedTopic,
+              page,
+              pageSize,
+              lastVisibleDocs,
+              value
+            );
+          } else {
+            result = await getFlashcardsBySubjectId(
+              selectedSubject,
+              page,
+              pageSize,
+              lastVisibleDocs,
+              value
+            );
+          }
 
-        // Cache cursor for next fetch
-        setLastVisibleDocs((prev) => ({
-          ...prev,
-          [page]: result.lastVisible,
-        }));
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setLoading(false);
-      }
-    }, 500),
-    []
+          setFlashcardList(result.data);
+
+          setPagination({
+            page,
+            pageSize,
+            total: result.total,
+          });
+
+          setLastVisibleDocs((prev) => ({
+            ...prev,
+            [page]: result.lastVisible,
+          }));
+        } catch (error) {
+          console.error("Error searching flashcards:", error);
+        } finally {
+          setLoading(false);
+        }
+      }, 500),
+    [selectedSubject, selectedTopic, lastVisibleDocs, pagination.pageSize]
   );
+
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const fetchFlashcards = async (
     page = pagination.page,

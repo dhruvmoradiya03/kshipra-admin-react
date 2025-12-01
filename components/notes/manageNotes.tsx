@@ -5,7 +5,7 @@ import { Work_Sans } from "next/font/google";
 import type { MenuProps } from "antd";
 import { Dropdown, Space } from "antd";
 import { DownOutlined } from "@ant-design/icons";
-import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import NotesList from "./NotesList";
 import AddNoteModal from "./AddNoteModal";
 import EditNoteModal from "./EditNoteModal";
@@ -58,53 +58,60 @@ const ManageNotes = () => {
     total: 0,
   });
 
-  const debouncedSearch = useCallback(
-    debounce(async (value: string, page = 1, pageSize = 10) => {
-      try {
-        let result;
-        setLoading(true);
-        if (selectedSubject && selectedTopic) {
-          result = await getNotesByTopicId(
-            selectedTopic,
-            page,
-            pageSize,
-            lastVisibleDocs,
-            value
-          );
-          console.log(result, "this is reult");
-        } else if (selectedSubject) {
-          result = await getNotesBySubjectId(
-            selectedSubject,
-            page,
-            pageSize,
-            lastVisibleDocs,
-            value
-          );
-        } else {
+  const debouncedSearch = useMemo(
+    () =>
+      debounce(async (value: string, page = 1, pageSize = 10) => {
+        if (!selectedSubject) {
           return;
         }
 
-        setNoteList(result.data);
+        try {
+          setLoading(true);
+          let result;
 
-        setPagination({
-          current: page,
-          pageSize,
-          total: result.total,
-        });
+          if (selectedTopic) {
+            result = await getNotesByTopicId(
+              selectedTopic,
+              page,
+              pageSize,
+              lastVisibleDocs,
+              value
+            );
+          } else {
+            result = await getNotesBySubjectId(
+              selectedSubject,
+              page,
+              pageSize,
+              lastVisibleDocs,
+              value
+            );
+          }
 
-        // Cache cursor for next fetch
-        setLastVisibleDocs((prev) => ({
-          ...prev,
-          [page]: result.lastVisible,
-        }));
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setLoading(false);
-      }
-    }, 500),
-    []
+          setNoteList(result.data);
+          setPagination({
+            current: page,
+            pageSize,
+            total: result.total,
+          });
+
+          setLastVisibleDocs((prev) => ({
+            ...prev,
+            [page]: result.lastVisible,
+          }));
+        } catch (error) {
+          console.error("Error searching notes:", error);
+        } finally {
+          setLoading(false);
+        }
+      }, 500),
+    [selectedSubject, selectedTopic, lastVisibleDocs, pagination.pageSize]
   );
+
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
 
   const fetchNotes = async (
     page = pagination.current,
