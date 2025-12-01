@@ -3,7 +3,9 @@
 import { Work_Sans } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import Logout from "./logout";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -46,7 +48,10 @@ const menu = [
 ];
 
 const Sidebar = () => {
-  const pathname = usePathname(); // ← URL-based active state
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
     <div
@@ -88,15 +93,34 @@ const Sidebar = () => {
       </div>
 
       <div className="flex flex-col py-7 items-center font-semibold">
-        <Link
-          href="/login"
-          className="flex gap-2 items-center cursor-pointer"
-          onClick={() => localStorage.clear()}
+        <button
+          type="button"
+          className="flex gap-2 items-center cursor-pointer text-start"
+          onClick={() => setIsLogoutModalVisible(true)}
         >
           <Image src="/images/logout.svg" alt="Logout" width={16} height={16} />
           <span className="text-[#D32F2F] text-lg">Logout</span>
-        </Link>
+        </button>
       </div>
+
+      <Logout
+        visible={isLogoutModalVisible}
+        loading={isLoggingOut}
+        onCancel={() => {
+          if (isLoggingOut) return;
+          setIsLogoutModalVisible(false);
+        }}
+        onConfirm={async () => {
+          try {
+            setIsLoggingOut(true);
+            localStorage.clear();
+            router.replace("/login");
+          } finally {
+            setIsLoggingOut(false);
+            setIsLogoutModalVisible(false);
+          }
+        }}
+      />
     </div>
   );
 };
