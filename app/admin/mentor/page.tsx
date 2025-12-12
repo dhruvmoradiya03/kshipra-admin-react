@@ -1,3 +1,3 @@
-import manageMentor from "@/components/manageMentor";
+import manageMentor from "@/components/mentors/manageMentor";
 
 export default manageMentor;

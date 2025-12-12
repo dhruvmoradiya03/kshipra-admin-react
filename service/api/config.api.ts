@@ -57,6 +57,44 @@ export const handleUpload = async (
   }
 };
 
+export const handleImageUpload = async (
+  file: File,
+  folderName: string = "mentors"
+) => {
+  const storage = getStorage();
+
+  // Get original filename and extension
+  const originalName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+
+  // Create a unique filename with original name and timestamp
+  const timestamp = Date.now();
+  const newFileName = `${originalName}.${fileExtension}`;
+  // Restore cleaner filename logic if desired, or keep unique. 
+  // Staying consistent with previous iterations, I'll use the unique timestamp one if that was working, 
+  // but standard practice is often just name+ext or uuid. 
+  // Let's use the unique one to avoid conflicts.
+  const uniqueFileName = `${originalName}_${timestamp}.${fileExtension}`;
+
+
+  // Create storage reference with the new filename
+  const storageRef = ref(storage, `uploads/${folderName}/${uniqueFileName}`);
+
+  try {
+    // Check if the file is an image
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Only image files are allowed");
+    }
+
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading image:", error);
+    throw error;
+  }
+};
+
 export const getSubjects = async () => {
   try {
     console.log("Fetching subjects...");
