@@ -1,3 +1,3 @@
-import bookingList from "@/components/bookingList";
+import ManageBookings from '@/components/bookings/manageBookings';
 
-export default bookingList;
+export default ManageBookings;
