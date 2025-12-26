@@ -5,6 +5,8 @@ import {
   serverTimestamp,
   query,
   where,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 import { getStorage } from "firebase/storage";
@@ -100,7 +102,10 @@ export const getSubjects = async () => {
     console.log("Fetching subjects...");
     const subjectsRef = collection(db, "subjects");
     const querySnapshot = await getDocs(subjectsRef);
-    const subjects = querySnapshot.docs.map((doc) => doc.data());
+    const subjects = querySnapshot.docs.map((doc) => ({
+      document_id: doc.id,
+      ...doc.data(),
+    }));
     return subjects;
   } catch (error: any) {
     console.error("Error fetching subjects:", error);
@@ -181,10 +186,38 @@ export const getTopics = async (subjectId: string) => {
     const querySnapshot = await getDocs(
       query(topicsRef, where("subjectId", "==", subjectId))
     );
-    const topics = querySnapshot.docs.map((doc) => doc.data());
+    const topics = querySnapshot.docs.map((doc) => ({
+      document_id: doc.id,
+      ...doc.data(),
+    }));
     return topics;
   } catch (error: any) {
     console.error("Error fetching topics:", error);
+    throw error;
+  }
+};
+
+export const createTopic = async (subjectId: string, name: string) => {
+  try {
+    const timestamp = serverTimestamp();
+    const topicsRef = collection(db, "topics");
+
+    const topicData: Topic = {
+      subjectId,
+      name,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    const docRef = await addDoc(topicsRef, topicData);
+
+    await updateDoc(docRef, {
+      document_id: docRef.id,
+    });
+
+    return { id: docRef.id, document_id: docRef.id, ...topicData };
+  } catch (error) {
+    console.error("Error creating topic:", error);
     throw error;
   }
 };

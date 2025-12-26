@@ -21,7 +21,7 @@ const menu = [
     icon: "/images/flashcards.svg",
   },
   {
-    name: "Mentor",
+    name: "Mentor Management",
     path: "/admin/mentor",
     icon: "/images/mentor.svg",
   },
@@ -39,11 +39,6 @@ const menu = [
     name: "List of Bookings",
     path: "/admin/list-of-bookings",
     icon: "/images/bookings.svg",
-  },
-  {
-    name: "Booking card",
-    path: "/admin/booking-card",
-    icon: "/images/booking-card.svg",
   },
 ];
 

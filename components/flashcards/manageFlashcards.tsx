@@ -521,7 +521,7 @@ const ManageFlashcards = () => {
               </Dropdown>
             </div>
 
-            <div className="relative h-full flex gap-4">
+            <div className="relative h-[50px] flex gap-4">
               <div className="flex items-center gap-2 shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
                 <Image
                   src="/images/plus.svg"

@@ -14,7 +14,7 @@ import {
 import { UploadOutlined } from "@ant-design/icons";
 import { Subject, Topic } from "./types";
 import { Work_Sans } from "next/font/google";
-import { getTopics, handleUpload } from "@/service/api/config.api";
+import { getTopics, handleUpload, createTopic } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 
@@ -39,6 +39,8 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState("");
+  const [options, setOptions] = useState<any[]>([]);
 
   const fetchTopics = async () => {
     try {
@@ -54,12 +56,38 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
     fetchTopics();
   }, [selectedSubject]);
 
+  useEffect(() => {
+    const topicList = topic || [];
+    const filtered = topicList.filter((t: any) =>
+      t.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+
+    const baseOptions = filtered.map((item: any) => ({
+      label: item.name,
+      value: item.document_id,
+    }));
+
+    const exactMatch = topicList.some(
+      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
+    );
+
+    if (searchValue && !exactMatch) {
+      baseOptions.push({
+        label: `Add "${searchValue}"`,
+        value: `NEW:${searchValue}`,
+      });
+    }
+
+    setOptions(baseOptions);
+  }, [topic, searchValue]);
+
   // Reset form and clear validation errors when modal is opened
   useEffect(() => {
     if (visible) {
       form.resetFields();
       setSelectedSubject(null);
       setTopic([]);
+      setSearchValue("");
     }
   }, [visible]);
 
@@ -95,6 +123,21 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
       } else {
         message.error("Please provide either a file or a link");
         return;
+      }
+
+      // Handle Topic Creation if needed
+      if (values.topic && values.topic.startsWith("NEW:")) {
+        const newTopicName = values.topic.substring(4);
+        try {
+          // Create the new topic
+          const newTopic = await createTopic(values.subject, newTopicName);
+          values.topic = newTopic.document_id;
+          message.success(`Topic "${newTopicName}" created successfully`);
+        } catch (err) {
+          console.error("Error creating topic:", err);
+          message.error("Failed to create new topic");
+          return;
+        }
       }
 
       // Update values with the file URL and save
@@ -154,12 +197,13 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Topic"
+                placeholder="Select or Create Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item: any) => ({
-                  label: item.name,
-                  value: item.document_id,
-                }))}
+                showSearch
+                filterOption={false}
+                onSearch={setSearchValue}
+                options={options}
+                notFoundContent={null}
               />
             </Form.Item>
           </Col>

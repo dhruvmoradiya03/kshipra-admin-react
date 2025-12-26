@@ -416,8 +416,8 @@ const ManageNotes = () => {
                   <span>
                     {selectedSubject
                       ? subject.find(
-                          (s: any) => s.document_id === selectedSubject
-                        )?.name || "Select Subject"
+                        (s: any) => s.document_id === selectedSubject
+                      )?.name || "Select Subject"
                       : "Select Subject"}
                   </span>
                   <DownOutlined className="text-xs" />
@@ -446,25 +446,23 @@ const ManageNotes = () => {
                 overlayClassName="w-[200px]"
               >
                 <div
-                  className={`flex items-center justify-between w-[200px] border ${
-                    !selectedSubject
+                  className={`flex items-center justify-between w-[200px] border ${!selectedSubject
                       ? "border-gray-200"
                       : "border-gray-300 hover:border-[#1E4640]"
-                  } rounded-xl py-3 px-4 ${
-                    !selectedSubject ? "text-gray-400" : "text-[#1E4640]"
-                  } bg-white cursor-pointer transition-colors`}
+                    } rounded-xl py-3 px-4 ${!selectedSubject ? "text-gray-400" : "text-[#1E4640]"
+                    } bg-white cursor-pointer transition-colors`}
                 >
                   <span>
                     {selectedTopic
                       ? topic.find((t: any) => t.document_id === selectedTopic)
-                          ?.name || "Select Topic"
+                        ?.name || "Select Topic"
                       : "Select Topic"}
                   </span>
                   <DownOutlined className="text-xs" />
                 </div>
               </Dropdown>
             </div>
-            <div className="relative h-full shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
+            <div className="relative h-[50px] shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
               <Image src="/images/plus.svg" width={20} height={20} alt="plus" />
               <button
                 className="text-[#1E4640] font-medium"

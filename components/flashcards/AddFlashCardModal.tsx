@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Modal, Form, Input, Select, Button, Col, Row, Spin } from "antd";
 import { Work_Sans } from "next/font/google";
-import { getTopics } from "@/service/api/config.api";
-import { getNotes, getNotesByTopicId } from "@/service/api/notes.api";
+import { getTopics, createTopic } from "@/service/api/config.api";
+import { getNotes, getNotesByTopicId, addNote } from "@/service/api/notes.api";
 import { debounce } from "lodash";
 
 interface Subject {
@@ -47,6 +47,10 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
     total: 0,
     lastVisible: null as any,
   });
+  const [searchValue, setSearchValue] = useState("");
+  const [options, setOptions] = useState<any[]>([]);
+  const [searchNoteValue, setSearchNoteValue] = useState("");
+  const [noteOptions, setNoteOptions] = useState<any[]>([]);
 
   const fetchTopics = async () => {
     try {
@@ -71,7 +75,8 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         selectedTopic,
         page,
         pageSize,
-        lastVisible
+        lastVisible,
+        searchNoteValue
       );
 
       if (isLoadMore) {
@@ -96,8 +101,15 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
   // Debounced version of fetchNotes for better performance
   const debouncedFetchNotes = useMemo(
     () => debounce(fetchNotes, 300),
-    [selectedTopic, pagination]
+    [selectedTopic, pagination.page, searchNoteValue]
   );
+
+  useEffect(() => {
+    // Re-fetch notes when search value changes
+    setPagination((prev) => ({ ...prev, page: 1, lastVisible: null, total: 0 }));
+    setNotes([]);
+    debouncedFetchNotes();
+  }, [searchNoteValue]);
 
   // Handle scroll event for infinite loading
   const handlePopupScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -120,6 +132,57 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
   }, [selectedSubject]);
 
   useEffect(() => {
+    const topicList = topic || [];
+    const filtered = topicList.filter((t: any) =>
+      t.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+
+    const baseOptions = filtered.map((item: any) => ({
+      label: item.name,
+      value: item.document_id,
+      topicId: item.document_id,
+    }));
+
+    const exactMatch = topicList.some(
+      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
+    );
+
+    if (searchValue && !exactMatch) {
+      baseOptions.push({
+        label: `Add "${searchValue}"`,
+        value: `NEW:${searchValue}`,
+        topicId: `NEW:${searchValue}`,
+      });
+    }
+
+    setOptions(baseOptions);
+  }, [topic, searchValue]);
+
+  useEffect(() => {
+    // Format existing notes
+    const formattedNotes = notes.map((item: any) => ({
+      label: item.title,
+      value: item.document_id,
+    }));
+
+    const exactMatch = notes.some(
+      (n: any) => n.title.toLowerCase() === searchNoteValue.toLowerCase()
+    );
+
+    // If search value exists and no exact match in current list, allow "Add New"
+    // Note: Since notes are paginated, this "No exact match" check is only against LOADED notes.
+    // Ideally we rely on the backend search returning the match if it exists.
+    if (searchNoteValue && !exactMatch) {
+      formattedNotes.push({
+        label: `Add Note: "${searchNoteValue}"`,
+        value: `NEW:${searchNoteValue}`,
+      });
+    }
+
+    setNoteOptions(formattedNotes);
+  }, [notes, searchNoteValue]);
+
+  useEffect(() => {
     // Reset pagination when topic changes
     setPagination({
       page: 1,
@@ -128,6 +191,7 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
       lastVisible: null,
     });
     setNotes([]);
+    setSearchNoteValue(""); // Reset search on topic change
     if (selectedTopic) {
       fetchNotes();
     }
@@ -147,6 +211,8 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         total: 0,
         lastVisible: null,
       });
+      setSearchValue("");
+      setSearchNoteValue("");
     }
   }, [visible]);
 
@@ -160,11 +226,47 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
   const handleSubmit = () => {
     form
       .validateFields()
-      .then((values) => {
+      .then(async (values) => {
+        // Handle Topic Creation if needed
+        if (values.topic && values.topic.startsWith("NEW:")) {
+          const newTopicName = values.topic.substring(4);
+          try {
+            // Create the new topic
+            const newTopic = await createTopic(values.subject, newTopicName);
+            values.topic = newTopic.document_id;
+            console.log(`Topic "${newTopicName}" created successfully`);
+          } catch (err) {
+            console.error("Error creating topic:", err);
+            return;
+          }
+        }
+
+        // Handle Note Creation if needed
+        let noteId = values.note;
+        if (values.note && values.note.startsWith("NEW:")) {
+          const newNoteTitle = values.note.substring(4);
+          try {
+            const newNote = await addNote({
+              subjectId: values.subject,
+              topicId: values.topic, // Note: if topic was new, it should be the new ID by now
+              title: newNoteTitle,
+              file: "", // Placeholder or handle as needed
+            });
+            noteId = newNote.document_id;
+            console.log(`Note "${newNoteTitle}" created successfully`);
+          } catch (err) {
+            console.error("Error creating note:", err);
+            return;
+          }
+        }
+
+        // Replace note value with actual ID (or new ID)
+        values.note = noteId;
+
         form.resetFields();
         onSave(values);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   return (
@@ -208,14 +310,21 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Topic"
+                placeholder="Select or Create Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item: any) => ({
-                  label: item.name,
-                  topicId: item.document_id,
-                  value: item.document_id,
-                }))}
-                onChange={(value) => setSelectedTopic(value)}
+                showSearch
+                filterOption={false}
+                onSearch={setSearchValue}
+                options={options}
+                notFoundContent={null}
+                onChange={(value) => {
+                  // Update state but don't try to fetch notes for a "new" topic placeholder
+                  if (typeof value === 'string' && value.startsWith("NEW:")) {
+                    setSelectedTopic(null);
+                  } else {
+                    setSelectedTopic(value);
+                  }
+                }}
               />
             </Form.Item>
           </Col>
@@ -229,47 +338,15 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Note"
-                className="h-[45px] rounded-lg font-400 w-full [&_.ant-select-selector]:h-full [&_.ant-select-selection-item]:h-full [&_.ant-select-selection-item]:flex [&_.ant-select-selection-item]:items-center"
+                placeholder="Select or Create Note"
+                className="h-[45px] rounded-lg font-400 w-full"
                 showSearch
-                optionFilterProp="label"
-                filterOption={(input, option) =>
-                  (option?.label ?? "")
-                    .toLowerCase()
-                    .includes(input.toLowerCase())
-                }
+                filterOption={false} // Server-side search
+                onSearch={(val) => setSearchNoteValue(val)}
                 listHeight={250}
-                dropdownMatchSelectWidth={false}
-                dropdownStyle={{ padding: 0 }}
-                popupClassName="[&_.ant-select-item-option-content]:whitespace-normal"
                 onPopupScroll={handlePopupScroll}
-                dropdownRender={(menu) => (
-                  <>
-                    {menu}
-                    {/* {loadingDropdown && (
-                      <div className="flex justify-center p-2">
-                        <Spin size="small" />
-                      </div>
-                    )} */}
-                    {/* {!loadingDropdown &&
-                      pagination.page * pagination.pageSize >=
-                        pagination.total &&
-                      pagination.total > 0 && (
-                        <div className="text-center p-2 text-gray-500 text-sm">
-                          No more notes
-                        </div>
-                      )} */}
-                    {/* {!loadingDropdown && notes.length === 0 && (
-                      <div className="text-center p-2 text-gray-500 text-sm">
-                        No notes found
-                      </div>
-                    )} */}
-                  </>
-                )}
-                options={notes.map((item: any) => ({
-                  label: item.title,
-                  value: item.document_id,
-                }))}
+                options={noteOptions}
+                notFoundContent={loadingDropdown ? <Spin size="small" /> : null}
                 onChange={(value) => setSelectedNote(value)}
               />
             </Form.Item>

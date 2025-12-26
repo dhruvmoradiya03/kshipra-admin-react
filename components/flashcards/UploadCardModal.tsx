@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Modal, Form, Select, Button, Col, Row, Upload } from "antd";
 import { Work_Sans } from "next/font/google";
-import { getTopics } from "@/service/api/config.api";
+import { getTopics, createTopic } from "@/service/api/config.api";
 import { InboxOutlined } from "@ant-design/icons";
 import type { UploadFile, UploadProps } from "antd";
 import Image from "next/image";
@@ -39,6 +39,8 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [topic, setTopic] = useState<any>([]);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [searchValue, setSearchValue] = useState("");
+  const [options, setOptions] = useState<any[]>([]);
 
   const fetchTopics = async () => {
     try {
@@ -54,9 +56,51 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
     fetchTopics();
   }, [selectedSubject]);
 
+  useEffect(() => {
+    const topicList = topic || [];
+    const filtered = topicList.filter((t: any) =>
+      t.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+
+    const baseOptions = filtered.map((item: any) => ({
+      label: item.name,
+      value: item.document_id,
+      topicId: item.document_id,
+    }));
+
+    const exactMatch = topicList.some(
+      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
+    );
+
+    if (searchValue && !exactMatch) {
+      baseOptions.push({
+        label: `Add "${searchValue}"`,
+        value: `NEW:${searchValue}`,
+        topicId: `NEW:${searchValue}`,
+      });
+    }
+
+    setOptions(baseOptions);
+  }, [topic, searchValue]);
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+
+      // Handle Topic Creation if needed
+      if (values.topic && values.topic.startsWith("NEW:")) {
+        const newTopicName = values.topic.substring(4);
+        try {
+          // Create the new topic
+          const newTopic = await createTopic(values.subject, newTopicName);
+          values.topic = newTopic.document_id;
+          console.log(`Topic "${newTopicName}" created successfully`);
+        } catch (err) {
+          console.error("Error creating topic:", err);
+          return;
+        }
+      }
+
       const payload = {
         ...values,
         file: fileList[0]?.originFileObj || fileList[0],
@@ -132,13 +176,13 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
               className={`font-medium text-[#1E4640] ${worksans.className}`}
             >
               <Select
-                placeholder="Select Topic"
+                placeholder="Select or Create Topic"
                 className="h-[45px] rounded-lg font-400"
-                options={topic?.map((item: any) => ({
-                  label: item.name,
-                  topicId: item.document_id,
-                  value: item.document_id,
-                }))}
+                showSearch
+                filterOption={false}
+                onSearch={setSearchValue}
+                options={options}
+                notFoundContent={null}
               />
             </Form.Item>
           </Col>
