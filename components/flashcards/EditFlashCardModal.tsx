@@ -25,7 +25,9 @@ interface Flashcard {
   subjectId: string;
   topicId: string;
   noteId: string;
+  questionTitle: string;
   question: string;
+  answerTitle: string;
   answer: string;
   category: string;
 }
@@ -123,7 +125,9 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         subjectId: flashcard.subjectId,
         topicId: flashcard.topicId,
         noteId: flashcard.noteId,
+        questionTitle: flashcard.questionTitle,
         question: flashcard.question,
+        answerTitle: flashcard.answerTitle,
         answer: flashcard.answer,
         category: flashcard.category || "",
       });
@@ -254,6 +258,23 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         </Row>
 
         <Form.Item
+          name="questionTitle"
+          label="Question Title"
+          rules={[{ required: true, message: "Please enter a question title" }]}
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <Input
+            placeholder="Add Question Title"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
+        </Form.Item>
+
+        <Form.Item
           name="question"
           label="Question"
           rules={[{ required: true, message: "Please enter a question" }]}
@@ -261,6 +282,23 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         >
           <Input
             placeholder="Add Question"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="answerTitle"
+          label="Answer Title"
+          rules={[{ required: true, message: "Please enter an answer title" }]}
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <Input
+            placeholder="Add Answer Title"
             style={{
               height: 45,
               borderRadius: 8,

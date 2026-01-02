@@ -15,6 +15,22 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
+const updateTopicNotesPdfUrl = async (topicId: string, fileUrl: unknown) => {
+  if (typeof topicId !== "string" || !topicId.trim()) {
+    return;
+  }
+
+  if (typeof fileUrl !== "string" || !fileUrl.trim()) {
+    return;
+  }
+
+  const topicRef = doc(db, "topics", topicId);
+  await updateDoc(topicRef, {
+    notes_pdf_url: fileUrl,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 export interface Note {
   id?: string;
   subjectId: string;
@@ -47,6 +63,8 @@ export const addNote = async (noteData: any) => {
       document_id: docRef.id,
     });
 
+    await updateTopicNotesPdfUrl(noteData.topicId, noteData.file);
+
     return {
       id: docRef.id,
       subjectId: noteData.subjectId,
@@ -76,6 +94,8 @@ export const updateNote = async (noteId: string, updateData: any) => {
       file: updateData.file,
       updatedAt: serverTimestamp(),
     });
+
+    await updateTopicNotesPdfUrl(updateData.topicId, updateData.file);
     return { id: noteId, ...updateData };
   } catch (error) {
     console.error("Error updating note:", error);

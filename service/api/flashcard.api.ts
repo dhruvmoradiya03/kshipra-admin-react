@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   where,
   getCountFromServer,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 import { getStorage, ref, uploadBytes } from "firebase/storage";
@@ -22,7 +23,9 @@ export interface Flashcard {
   subjectId: string;
   topicId: string;
   noteId: string;
+  questionTitle: string;
   question: string;
+  answerTitle: string;
   answer: string;
   category: string;
   isDeleted: boolean;
@@ -40,29 +43,51 @@ export const addFlashcard = async (
 ) => {
   try {
     const timestamp = serverTimestamp();
+    const topicRef = doc(db, "topics", flashcardData.topicId);
 
-    // Step 1: Create the document
-    const docRef = await addDoc(collection(db, "flashcards"), {
-      subjectId: flashcardData.subjectId,
-      topicId: flashcardData.topicId,
-      noteId: flashcardData.noteId,
-      question: flashcardData.question,
-      answer: flashcardData.answer,
-      category: flashcardData.category,
-      isDeleted: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
+    // Use transaction to ensure atomicity
+    let newFlashcardRef: any;
 
-    // Step 2: Immediately update the new document with document_id
-    await updateDoc(docRef, {
-      document_id: docRef.id,
+    await runTransaction(db, async (tx) => {
+      // Get the current topic data
+      const topicSnap = await tx.get(topicRef);
+      if (!topicSnap.exists()) {
+        throw new Error("Topic not found");
+      }
+
+      const topicData = topicSnap.data();
+      const currentTotalFlashcards = topicData?.total_flashcards || 0;
+      const newTotalFlashcards = currentTotalFlashcards + 1;
+
+      // Create the flashcard document
+      newFlashcardRef = doc(collection(db, "flashcards"));
+      
+      tx.set(newFlashcardRef, {
+        subjectId: flashcardData.subjectId,
+        topicId: flashcardData.topicId,
+        noteId: flashcardData.noteId,
+        questionTitle: flashcardData.questionTitle,
+        question: flashcardData.question,
+        answerTitle: flashcardData.answerTitle,
+        answer: flashcardData.answer,
+        category: flashcardData.category,
+        isDeleted: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        document_id: newFlashcardRef.id,
+      });
+
+      // Update the topic's total_flashcards count
+      tx.update(topicRef, {
+        total_flashcards: newTotalFlashcards,
+        updatedAt: timestamp,
+      });
     });
 
     return {
-      id: docRef.id,
+      id: newFlashcardRef.id,
       ...flashcardData,
-      document_id: docRef.id,
+      document_id: newFlashcardRef.id,
       isDeleted: false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -76,7 +101,7 @@ export const addFlashcard = async (
 const normalize = (value: unknown): string => String(value ?? "").trim();
 const normalizeKey = (value: unknown): string => normalize(value).toLowerCase();
 
-const REQUIRED_HEADERS = ["note title", "question", "answer", "category"];
+const REQUIRED_HEADERS = ["note title", "question title", "question", "answer title", "answer", "category"];
 
 interface BulkUploadResult {
   totalCount: number;
@@ -176,45 +201,87 @@ export const uploadFlashcardsFromExcel = async (
   });
 
   let successCount = 0;
+  const topicRef = doc(db, "topics", topicId);
 
-  for (const row of dataRows) {
-    const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
-      normalize(row[index])
-    );
-    const [noteTitle, question, answer, category] = normalizedCells;
-
-    if (!noteTitle || !question || !answer || !category) {
-      continue;
+  // Use transaction to update total_flashcards count atomically
+  await runTransaction(db, async (tx) => {
+    // Get current topic data
+    const topicSnap = await tx.get(topicRef);
+    if (!topicSnap.exists()) {
+      throw new Error("Topic not found");
     }
 
-    const note = noteMap.get(normalizeKey(noteTitle));
-    if (!note) {
-      continue;
-    }
+    const topicData = topicSnap.data();
+    const currentTotalFlashcards = topicData?.total_flashcards || 0;
 
-    try {
-      const timestamp = serverTimestamp();
-      const docRef = await addDoc(collection(db, "flashcards"), {
-        subjectId,
-        topicId,
-        noteId: note.id,
+    for (const row of dataRows) {
+      const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
+        normalize(row[index])
+      );
+      const [noteTitle, questionTitle, question, answerTitle, answer, category] = normalizedCells;
+
+      console.log("Processing row:", {
+        originalRow: row,
+        normalizedCells,
+        noteTitle,
+        questionTitle,
         question,
+        answerTitle,
         answer,
-        category,
-        isDeleted: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        category
       });
 
-      await updateDoc(docRef, {
-        document_id: docRef.id,
-      });
+      if (!noteTitle || !question || !answer || !category || !questionTitle || !answerTitle) {
+        console.log("Skipping row - missing required fields:", {
+          noteTitle: !!noteTitle,
+          questionTitle: !!questionTitle,
+          question: !!question,
+          answerTitle: !!answerTitle,
+          answer: !!answer,
+          category: !!category
+        });
+        continue;
+      }
 
-      successCount += 1;
-    } catch (error) {
-      console.error("Failed to import flashcard row:", error);
+      const note = noteMap.get(normalizeKey(noteTitle));
+      console.log("Looking for note:", noteTitle, "found:", note);
+      if (!note) {
+        console.log("Skipping row - note not found:", noteTitle);
+        console.log("Available notes:", Array.from(noteMap.keys()));
+        continue;
+      }
+
+      try {
+        const timestamp = serverTimestamp();
+        const docRef = doc(collection(db, "flashcards"));
+        
+        tx.set(docRef, {
+          subjectId,
+          topicId,
+          noteId: note.id,
+          question,
+          questionTitle,
+          answerTitle,
+          answer,
+          category,
+          isDeleted: false,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          document_id: docRef.id,
+        });
+
+        successCount += 1;
+      } catch (error) {
+        console.error("Failed to import flashcard row:", error);
+      }
     }
-  }
+
+    // Update the topic's total_flashcards count
+    tx.update(topicRef, {
+      total_flashcards: currentTotalFlashcards + successCount,
+      updatedAt: serverTimestamp(),
+    });
+  });
 
   const totalCount = dataRows.length;
   const skippedCount = totalCount - successCount;
@@ -252,11 +319,44 @@ export const updateFlashcard = async (
 // Soft delete a flashcard
 export const deleteFlashcard = async (flashcardId: string) => {
   try {
+    const timestamp = serverTimestamp();
     const flashcardRef = doc(db, "flashcards", flashcardId);
-    await updateDoc(flashcardRef, {
-      isDeleted: true,
-      updatedAt: serverTimestamp(),
+
+    // Use transaction to ensure atomicity
+    await runTransaction(db, async (tx) => {
+      // Get the flashcard data first to find the topicId
+      const flashcardSnap = await tx.get(flashcardRef);
+      if (!flashcardSnap.exists()) {
+        throw new Error("Flashcard not found");
+      }
+
+      const flashcardData = flashcardSnap.data();
+      const topicId = flashcardData.topicId;
+      const topicRef = doc(db, "topics", topicId);
+
+      // Get the current topic data
+      const topicSnap = await tx.get(topicRef);
+      if (!topicSnap.exists()) {
+        throw new Error("Topic not found");
+      }
+
+      const topicData = topicSnap.data();
+      const currentTotalFlashcards = topicData?.total_flashcards || 0;
+      const newTotalFlashcards = Math.max(0, currentTotalFlashcards - 1); // Ensure we don't go below 0
+
+      // Soft delete the flashcard
+      tx.update(flashcardRef, {
+        isDeleted: true,
+        updatedAt: timestamp,
+      });
+
+      // Update the topic's total_flashcards count
+      tx.update(topicRef, {
+        total_flashcards: newTotalFlashcards,
+        updatedAt: timestamp,
+      });
     });
+
     return { success: true };
   } catch (error) {
     console.error("Error deleting flashcard:", error);

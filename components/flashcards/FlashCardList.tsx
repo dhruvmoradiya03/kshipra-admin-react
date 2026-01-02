@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Button, Card, Space, Table, Typography, Skeleton } from "antd";
-import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
+import { Button, Space, Table, Typography, Skeleton } from "antd";
+import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import { Flashcard } from "@/types/flashcard";
 import { getNoteById } from "@/service/api/notes.api";
 
@@ -72,19 +72,9 @@ interface Flashcard {
   subjectId: string;
   topicId: string;
   noteId: string;
+  questionTitle?: string;
   question: string;
-  answer: string;
-  category: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface Flashcard {
-  id: string;
-  subjectId: string;
-  topicId: string;
-  noteId: string;
-  question: string;
+  answerTitle?: string;
   answer: string;
   category: string;
   createdAt: Date;
@@ -140,11 +130,33 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       },
     },
     {
+      title: "Question Title",
+      dataIndex: "questionTitle",
+      key: "questionTitle",
+      width: "18%",
+      render: (text: string) => (
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          {text}
+        </Text>
+      ),
+    },
+    {
       title: "Question",
       dataIndex: "question",
       key: "question",
       width: "24%",
       render: (text: string, record: Flashcard) => (
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          {text}
+        </Text>
+      ),
+    },
+    {
+      title: "Answer Title",
+      dataIndex: "answerTitle",
+      key: "answerTitle",
+      width: "18%",
+      render: (text: string) => (
         <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
           {text}
         </Text>

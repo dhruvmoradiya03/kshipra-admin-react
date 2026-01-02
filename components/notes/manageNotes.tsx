@@ -174,21 +174,26 @@ const ManageNotes = () => {
 
   const fetchTopics = async () => {
     try {
-      if (!selectedSubject) return;
+      if (!selectedSubject) {
+        console.log("No subject selected, skipping topics fetch");
+        setTopic([]);
+        return;
+      }
 
-      console.log(selectedSubject);
+      console.log("Fetching topics for subject:", selectedSubject);
       const topics = await getTopics(selectedSubject);
 
-      console.log(topics, "this is topics");
+      console.log("Raw topics data:", topics);
+      console.log("Topics structure:", topics.map((t: any) => ({ id: t.document_id, name: t.name, hasDocumentId: !!t.document_id })));
       setTopic(topics);
     } catch (error) {
       console.error("Error fetching topics:", error);
+      setTopic([]);
     }
   };
 
   useEffect(() => {
     fetchSubjects();
-    fetchTopics();
   }, []);
 
   useEffect(() => {
@@ -408,6 +413,10 @@ const ManageNotes = () => {
                   })),
                   selectable: true,
                   onSelect: (e) => handleSubjectChange(e.key),
+                  style: {
+                    maxHeight: 618, // 👈 control height here
+                    overflowY: "auto", // 👈 enable vertical scroll
+                  },
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
@@ -416,8 +425,8 @@ const ManageNotes = () => {
                   <span>
                     {selectedSubject
                       ? subject.find(
-                        (s: any) => s.document_id === selectedSubject
-                      )?.name || "Select Subject"
+                          (s: any) => s.document_id === selectedSubject
+                        )?.name || "Select Subject"
                       : "Select Subject"}
                   </span>
                   <DownOutlined className="text-xs" />
@@ -441,21 +450,27 @@ const ManageNotes = () => {
                     setLastVisibleDocs({});
                     setSelectedTopic(e.key);
                   },
+                  style: {
+                    maxHeight: 618, 
+                    overflowY: "auto", 
+                  },
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
               >
                 <div
-                  className={`flex items-center justify-between w-[200px] border ${!selectedSubject
+                  className={`flex items-center justify-between w-[200px] border ${
+                    !selectedSubject
                       ? "border-gray-200"
                       : "border-gray-300 hover:border-[#1E4640]"
-                    } rounded-xl py-3 px-4 ${!selectedSubject ? "text-gray-400" : "text-[#1E4640]"
-                    } bg-white cursor-pointer transition-colors`}
+                  } rounded-xl py-3 px-4 ${
+                    !selectedSubject ? "text-gray-400" : "text-[#1E4640]"
+                  } bg-white cursor-pointer transition-colors`}
                 >
                   <span>
                     {selectedTopic
                       ? topic.find((t: any) => t.document_id === selectedTopic)
-                        ?.name || "Select Topic"
+                          ?.name || "Select Topic"
                       : "Select Topic"}
                   </span>
                   <DownOutlined className="text-xs" />

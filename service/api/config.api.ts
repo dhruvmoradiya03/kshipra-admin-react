@@ -7,6 +7,7 @@ import {
   where,
   updateDoc,
   doc,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 import { getStorage } from "firebase/storage";
@@ -15,6 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 interface Subject {
   id?: string;
   name: string;
+  total_topics?: number;
   createdAt: any;
   updatedAt: any;
 }
@@ -22,9 +24,17 @@ interface Subject {
 interface Topic {
   id?: string;
   subjectId: string;
+  subject_id?: string;
   name: string;
-  createdAt: any;
-  updatedAt: any;
+  title?: string;
+  normalizedName?: string;
+  order?: number;
+  is_active?: boolean;
+  notes_pdf_url?: string;
+  total_flashcards?: number;
+  document_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export const handleUpload = async (
@@ -145,30 +155,53 @@ export const postSeed = async () => {
       const timestamp = serverTimestamp();
       const subjectData: Subject = {
         name: subject.name,
+        total_topics: 0,
         createdAt: timestamp,
         updatedAt: timestamp,
       };
 
       const docRef = await addDoc(subjectsRef, subjectData);
-      addedSubjects.push({ id: docRef.id, ...subjectData });
+      addedSubjects.push({ id: docRef.id, ref: docRef, ...subjectData });
     }
 
     // Add topics with proper subject references
     const topicsRef = collection(db, "topics");
+    const topicOrderBySubjectId = new Map<string, number>();
 
     for (const topic of topicsData) {
       const subject = addedSubjects[topic.subjectIndex];
       if (!subject) continue;
 
+      const currentOrder = topicOrderBySubjectId.get(subject.id) ?? 0;
+      const nextOrder = currentOrder + 1;
+      topicOrderBySubjectId.set(subject.id, nextOrder);
+
       const timestamp = serverTimestamp();
+      const nowIso = new Date().toISOString();
       const topicData: Topic = {
         subjectId: subject.id,
+        subject_id: subject.id,
         name: topic.name,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        title: topic.name,
+        normalizedName: topic.name.trim().toLowerCase(),
+        order: nextOrder,
+        is_active: true,
+        notes_pdf_url: "",
+        total_flashcards: 0,
+        created_at: nowIso,
+        updated_at: nowIso,
       };
 
-      await addDoc(topicsRef, topicData);
+      const topicDocRef = await addDoc(topicsRef, topicData);
+      await updateDoc(topicDocRef, { document_id: topicDocRef.id });
+    }
+
+    for (const subject of addedSubjects) {
+      const totalTopics = topicOrderBySubjectId.get(subject.id) ?? 0;
+      await updateDoc(subject.ref, {
+        total_topics: totalTopics,
+        updatedAt: serverTimestamp(),
+      });
     }
 
     console.log("Seed data added successfully!");
@@ -183,13 +216,32 @@ export const getTopics = async (subjectId: string) => {
   try {
     const topicsRef = collection(db, "topics");
 
+    // Try to get topics with subjectId field first (new structure)
     const querySnapshot = await getDocs(
       query(topicsRef, where("subjectId", "==", subjectId))
     );
-    const topics = querySnapshot.docs.map((doc) => ({
+    
+    let topics = querySnapshot.docs.map((doc) => ({
       document_id: doc.id,
       ...doc.data(),
     }));
+
+    // If no topics found with subjectId, try with subject_id (old structure)
+    if (topics.length === 0) {
+      console.log("No topics found with subjectId, trying subject_id field");
+      const oldQuerySnapshot = await getDocs(
+        query(topicsRef, where("subject_id", "==", subjectId))
+      );
+      
+      topics = oldQuerySnapshot.docs.map((doc) => ({
+        document_id: doc.id,
+        ...doc.data(),
+      }));
+      
+      console.log("Found topics with old structure:", topics.length);
+    }
+
+    console.log("Final topics data:", topics);
     return topics;
   } catch (error: any) {
     console.error("Error fetching topics:", error);
@@ -199,28 +251,78 @@ export const getTopics = async (subjectId: string) => {
 
 export const createTopic = async (subjectId: string, name: string) => {
   try {
-    const timestamp = serverTimestamp();
+    const trimmedName = name.trim();
+    const normalizedName = trimmedName.toLowerCase();
+
     const topicsRef = collection(db, "topics");
+    const subjectRef = doc(db, "subjects", subjectId);
 
-    const topicData: Topic = {
-      subjectId,
-      name,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
+    // 🔎 Check for existing topic ONLY under this subject
+    const q = query(
+      topicsRef,
+      where("subjectId", "==", subjectId),
+      where("normalizedName", "==", normalizedName)
+    );
 
-    const docRef = await addDoc(topicsRef, topicData);
+    const snap = await getDocs(q);
 
-    await updateDoc(docRef, {
-      document_id: docRef.id,
+    // If topic already exists for this subject → return it (no increment)
+    if (!snap.empty) {
+      const docSnap = snap.docs[0];
+      return {
+        id: docSnap.id,
+        document_id: docSnap.id,
+        ...docSnap.data(),
+      };
+    }
+
+    // 🔁 Transaction: create topic + increment subject.total_topics
+    let newTopicRef: any;
+
+    await runTransaction(db, async (tx) => {
+      newTopicRef = doc(topicsRef);
+
+      const subjectSnap = await tx.get(subjectRef);
+      const subjectData = subjectSnap.data();
+      const currentTotalTopicsRaw = subjectData?.total_topics;
+      const currentTotalTopics =
+        typeof currentTotalTopicsRaw === "number" ? currentTotalTopicsRaw : 0;
+      const nextOrder = currentTotalTopics + 1;
+      const nowIso = new Date().toISOString();
+
+      tx.set(newTopicRef, {
+        subjectId: subjectId, // Use consistent field name
+        subject_id: subjectId, // Keep for backward compatibility
+        name: trimmedName,
+        title: trimmedName,
+        normalizedName, 
+        order: nextOrder,
+        is_active: true,
+        notes_pdf_url: "",
+        total_flashcards: 0,
+        created_at: nowIso,
+        updated_at: nowIso,
+        document_id: newTopicRef.id,
+      });
+
+      tx.update(subjectRef, {
+        total_topics: nextOrder,
+        updatedAt: serverTimestamp(),
+      });
     });
 
-    return { id: docRef.id, document_id: docRef.id, ...topicData };
+    return {
+      id: newTopicRef.id,
+      document_id: newTopicRef.id,
+      subjectId,
+      name: trimmedName,
+    };
   } catch (error) {
     console.error("Error creating topic:", error);
     throw error;
   }
 };
+
 
 interface Note {
   id?: string;

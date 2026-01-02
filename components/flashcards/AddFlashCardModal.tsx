@@ -106,7 +106,12 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
 
   useEffect(() => {
     // Re-fetch notes when search value changes
-    setPagination((prev) => ({ ...prev, page: 1, lastVisible: null, total: 0 }));
+    setPagination((prev) => ({
+      ...prev,
+      page: 1,
+      lastVisible: null,
+      total: 0,
+    }));
     setNotes([]);
     debouncedFetchNotes();
   }, [searchNoteValue]);
@@ -266,7 +271,7 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         form.resetFields();
         onSave(values);
       })
-      .catch(() => { });
+      .catch(() => {});
   };
 
   return (
@@ -318,12 +323,7 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
                 options={options}
                 notFoundContent={null}
                 onChange={(value) => {
-                  // Update state but don't try to fetch notes for a "new" topic placeholder
-                  if (typeof value === 'string' && value.startsWith("NEW:")) {
-                    setSelectedTopic(null);
-                  } else {
-                    setSelectedTopic(value);
-                  }
+                  setSelectedTopic(value);
                 }}
               />
             </Form.Item>
@@ -353,6 +353,25 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
           </Col>
         </Row>
 
+         <Form.Item
+          name="questionTitle"
+          label="Question Title"
+          rules={[{ required: true, message: "Add Question Title" }]}
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <div className="flex gap-3">
+            <Input
+              placeholder="Add Question Title"
+              style={{
+                height: 45,
+                borderRadius: 8,
+                fontFamily: "Work Sans",
+                fontWeight: 400,
+              }}
+            />
+          </div>
+        </Form.Item>
+
         <Form.Item
           name="question"
           label="Question"
@@ -362,6 +381,25 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
           <div className="flex gap-3">
             <Input
               placeholder="Add Question"
+              style={{
+                height: 45,
+                borderRadius: 8,
+                fontFamily: "Work Sans",
+                fontWeight: 400,
+              }}
+            />
+          </div>
+        </Form.Item>
+
+        <Form.Item
+          name="answerTitle"
+          label="Answer Title"
+          rules={[{ required: true, message: "Add Answer Title" }]}
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <div className="flex gap-3">
+            <Input
+              placeholder="Add Answer Title"
               style={{
                 height: 45,
                 borderRadius: 8,

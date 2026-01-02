@@ -78,15 +78,21 @@ const ManageFlashcards = () => {
 
   const fetchTopics = async () => {
     try {
-      if (!selectedSubject) return;
+      if (!selectedSubject) {
+        console.log("No subject selected, skipping topics fetch");
+        setTopic([]);
+        return;
+      }
 
-      console.log(selectedSubject);
+      console.log("Fetching topics for subject:", selectedSubject);
       const topics = await getTopics(selectedSubject);
 
-      console.log(topics, "this is topics");
+      console.log("Raw topics data:", topics);
+      console.log("Topics structure:", topics.map((t: any) => ({ id: t.document_id, name: t.name, hasDocumentId: !!t.document_id })));
       setTopic(topics);
     } catch (error) {
       console.error("Error fetching topics:", error);
+      setTopic([]);
     }
   };
 
@@ -216,7 +222,6 @@ const ManageFlashcards = () => {
 
   useEffect(() => {
     fetchSubjects();
-    fetchTopics();
   }, []);
 
   // Handle subject change
@@ -244,7 +249,9 @@ const ManageFlashcards = () => {
         subjectId: values.subject,
         topicId: values.topic,
         noteId: values.note,
+        questionTitle: values.questionTitle,
         question: values.question,
+        answerTitle: values.answerTitle,
         answer: values.answer,
         category: values.category,
       });
@@ -471,6 +478,10 @@ const ManageFlashcards = () => {
                   })),
                   selectable: true,
                   onSelect: (e) => handleSubjectChange(e.key),
+                  style: {
+                    maxHeight: 618,
+                    overflowY: "auto",
+                  },
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
@@ -488,14 +499,21 @@ const ManageFlashcards = () => {
               </Dropdown>
               <Dropdown
                 menu={{
-                  items: topic.map((item: any) => ({
-                    key: item.document_id,
-                    label: item.name,
-                  })),
+                  items: topic.map((item: any) => {
+                    console.log("Mapping topic item:", item);
+                    return {
+                      key: item.document_id,
+                      label: item.name,
+                    };
+                  }),
                   selectable: true,
                   disabled: !selectedSubject,
                   onSelect: (e) => {
                     setSelectedTopic(e.key);
+                  },
+                  style: {
+                    maxHeight: 618,
+                    overflowY: "auto",
                   },
                 }}
                 trigger={["click"]}
@@ -522,7 +540,7 @@ const ManageFlashcards = () => {
             </div>
 
             <div className="relative h-[50px] flex gap-4">
-              <div className="flex items-center gap-2 shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
+              <div className="shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
                 <Image
                   src="/images/plus.svg"
                   width={20}
@@ -537,7 +555,7 @@ const ManageFlashcards = () => {
                 </button>
               </div>
               <button
-                className="text-[#1E4640] bg-[#1E4640] font-medium shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-6 cursor-pointer text-white rounded-xl items-center justify-center flex transition-all duration-300 hover:-translate-y-0.2"
+                className="bg-[#1E4640] font-medium shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-6 cursor-pointer text-white rounded-xl items-center justify-center flex transition-all duration-300 hover:-translate-y-0.2"
                 onClick={() => setIsUploadModalVisible(true)}
               >
                 Upload via CSV
