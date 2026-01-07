@@ -16,22 +16,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
-const updateTopicNotesPdfUrl = async (topicId: string, fileUrl: unknown) => {
-  if (typeof topicId !== "string" || !topicId.trim()) {
-    return;
-  }
-
-  if (typeof fileUrl !== "string" || !fileUrl.trim()) {
-    return;
-  }
-
-  const topicRef = doc(db, "topics", topicId);
-  await updateDoc(topicRef, {
-    notes_pdf_url: fileUrl,
-    updatedAt: serverTimestamp(),
-  });
-};
-
 const updateTopicNotesCount = async (topicId: string, increment: number = 1) => {
   if (typeof topicId !== "string" || !topicId.trim() || topicId === "unknown_topic") {
     return;
@@ -87,9 +71,6 @@ export const addNote = async (noteData: any) => {
 
     await setDoc(docRef, dataToSave);
 
-    // Update topic's PDF URL and notes count
-    await updateTopicNotesPdfUrl(noteData.topic_id, noteData.pdf_url);
-    
     // Get current topic to increment total_notes
     if (noteData.topic_id && noteData.topic_id !== "unknown_topic") {
       try {
@@ -139,7 +120,6 @@ export const updateNote = async (noteId: string, updateData: any) => {
       updated_at: new Date().toISOString(),
     });
 
-    await updateTopicNotesPdfUrl(updateData.topic_id, updateData.pdf_url);
     return { id: noteId, ...updateData };
   } catch (error) {
     console.error("Error updating note:", error);

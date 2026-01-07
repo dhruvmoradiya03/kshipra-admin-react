@@ -12,8 +12,15 @@ interface Subject {
 
 interface Topic {
   id: string;
-  title: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
   subject_id: string;
+  title: string;
+  total_flashcards: number;
+  total_notes: number;
+  updated_at: string;
 }
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });

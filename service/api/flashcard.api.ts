@@ -60,6 +60,34 @@ export const addFlashcard = async (
       const currentTotalFlashcards = topicData?.total_flashcards || 0;
       const newTotalFlashcards = currentTotalFlashcards + 1;
 
+      // Get the current note data
+      const noteRef = doc(db, "notes", flashcardData.note_id);
+      const noteSnap = await tx.get(noteRef);
+      if (!noteSnap.exists()) {
+        throw new Error("Note not found");
+      }
+
+      const noteData = noteSnap.data();
+      const currentNoteFlashcards = noteData?.total_flashcards || 0;
+      const newNoteFlashcards = currentNoteFlashcards + 1;
+
+      // Get the highest order number for flashcards in this topic
+      const flashcardsQuery = query(
+        collection(db, "flashcards"),
+        where("topic_id", "==", flashcardData.topic_id),
+        where("isDeleted", "==", false),
+        orderBy("order", "desc"),
+        limit(1)
+      );
+      
+      const flashcardsSnap = await getDocs(flashcardsQuery);
+      let nextOrder = 1;
+      
+      if (!flashcardsSnap.empty) {
+        const highestOrderFlashcard = flashcardsSnap.docs[0].data();
+        nextOrder = (highestOrderFlashcard.order || 0) + 1;
+      }
+
       // Create the flashcard document
       newFlashcardRef = doc(collection(db, "flashcards"));
       
@@ -71,7 +99,7 @@ export const addFlashcard = async (
         question: flashcardData.question,
         answer_title: flashcardData.answer_title,
         answer: flashcardData.answer,
-        order: flashcardData.order || 1,
+        order: nextOrder,
         is_active: true,
         isDeleted: false,
         created_at: nowIso,
@@ -82,6 +110,12 @@ export const addFlashcard = async (
       // Update the topic's total_flashcards count
       tx.update(topicRef, {
         total_flashcards: newTotalFlashcards,
+        updated_at: nowIso,
+      });
+
+      // Update the note's total_flashcards count
+      tx.update(noteRef, {
+        total_flashcards: newNoteFlashcards,
         updated_at: nowIso,
       });
     });
@@ -341,7 +375,7 @@ export const deleteFlashcard = async (flashcardId: string) => {
 
     // Use transaction to ensure atomicity
     await runTransaction(db, async (tx) => {
-      // Get the flashcard data first to find the topicId
+      // Get flashcard data first to find topicId and noteId
       const flashcardSnap = await tx.get(flashcardRef);
       if (!flashcardSnap.exists()) {
         throw new Error("Flashcard not found");
@@ -349,9 +383,11 @@ export const deleteFlashcard = async (flashcardId: string) => {
 
       const flashcardData = flashcardSnap.data();
       const topicId = flashcardData.topic_id;
+      const noteId = flashcardData.note_id;
       const topicRef = doc(db, "topics", topicId);
+      const noteRef = doc(db, "notes", noteId);
 
-      // Get the current topic data
+      // Get current topic data
       const topicSnap = await tx.get(topicRef);
       if (!topicSnap.exists()) {
         throw new Error("Topic not found");
@@ -361,7 +397,17 @@ export const deleteFlashcard = async (flashcardId: string) => {
       const currentTotalFlashcards = topicData?.total_flashcards || 0;
       const newTotalFlashcards = Math.max(0, currentTotalFlashcards - 1); // Ensure we don't go below 0
 
-      // Soft delete the flashcard
+      // Get current note data
+      const noteSnap = await tx.get(noteRef);
+      if (!noteSnap.exists()) {
+        throw new Error("Note not found");
+      }
+
+      const noteData = noteSnap.data();
+      const currentNoteFlashcards = noteData?.total_flashcards || 0;
+      const newNoteFlashcards = Math.max(0, currentNoteFlashcards - 1); // Ensure we don't go below 0
+
+      // Soft delete flashcard
       tx.update(flashcardRef, {
         isDeleted: true,
         updated_at: nowIso,
@@ -370,6 +416,12 @@ export const deleteFlashcard = async (flashcardId: string) => {
       // Update the topic's total_flashcards count
       tx.update(topicRef, {
         total_flashcards: newTotalFlashcards,
+        updated_at: nowIso,
+      });
+
+      // Update the note's total_flashcards count
+      tx.update(noteRef, {
+        total_flashcards: newNoteFlashcards,
         updated_at: nowIso,
       });
     });

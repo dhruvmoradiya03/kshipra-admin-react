@@ -16,8 +16,15 @@ interface Subject {
 
 interface Topic {
   id: string;
-  title: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
   subject_id: string;
+  title: string;
+  total_flashcards: number;
+  total_notes: number;
+  updated_at: string;
 }
 
 interface Flashcard {
@@ -163,10 +170,20 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
     try {
       setLoading(true);
       const values = await form.validateFields();
-      await onSave({
+      
+      // Transform form field names to database field names
+      const transformedValues = {
         id: flashcard?.id,
-        ...values,
-      });
+        subject_id: values.subject,
+        topic_id: values.topic,
+        note_id: values.note,
+        question_title: values.questionTitle,
+        question: values.question,
+        answer_title: values.answerTitle,
+        answer: values.answer,
+      };
+      
+      await onSave(transformedValues);
       message.success("Flashcard updated successfully!");
     } catch (error) {
       console.error("Validation failed:", error);

@@ -478,7 +478,7 @@ const ManageNotes = () => {
                   <span>
                     {selectedTopic
                       ? topic.find((t: any) => t.document_id === selectedTopic)
-                          ?.name || "Select Topic"
+                          ?.title || topic.find((t: any) => t.document_id === selectedTopic)?.name || "Select Topic"
                       : "Select Topic"}
                   </span>
                   <DownOutlined className="text-xs" />
