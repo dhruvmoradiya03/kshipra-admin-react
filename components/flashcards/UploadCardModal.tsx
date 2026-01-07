@@ -59,17 +59,17 @@ const UploadFlashCardModal: React.FC<UploadFlashCardModalProps> = ({
   useEffect(() => {
     const topicList = topic || [];
     const filtered = topicList.filter((t: any) =>
-      t.name.toLowerCase().includes(searchValue.toLowerCase())
+      (t.title || t.name || "").toLowerCase().includes(searchValue.toLowerCase())
     );
 
     const baseOptions = filtered.map((item: any) => ({
-      label: item.name,
+      label: item.title || item.name || "Untitled Topic",
       value: item.document_id,
       topicId: item.document_id,
     }));
 
     const exactMatch = topicList.some(
-      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
+      (t: any) => (t.title || t.name || "").toLowerCase() === searchValue.toLowerCase()
     );
 
     if (searchValue && !exactMatch) {

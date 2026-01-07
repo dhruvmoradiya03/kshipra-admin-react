@@ -63,24 +63,24 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
   useEffect(() => {
     if (note) {
       // First set the selected subject and topic states
-      setSelectedSubject(note.subjectId);
+      setSelectedSubject(note.subject_id);
 
-      console.log(note.file, "[][][][]this is done");
+      console.log(note.pdf_url, "[][][][]this is done");
 
-      // Then set the form values
+      // Then set form values
       form.setFieldsValue({
-        subject: note.subjectId || "",
-        topic: note.topicId || "",
+        subject: note.subject_id || "",
+        topic: note.topic_id || "",
         title: note.title || "",
-        file: note.file || "",
+        file: note.pdf_url || "",
       });
 
       // If there's a subject, fetch its topics
-      if (note.subjectId) {
-        getTopics(note.subjectId).then((topics) => {
+      if (note.subject_id) {
+        getTopics(note.subject_id).then((topics) => {
           setTopic(topics);
-          // Set the topic after topics are loaded
-          setSelectedTopic(note.topicId);
+          // Set topic after topics are loaded
+          setSelectedTopic(note.topic_id);
         });
       }
     }
@@ -98,7 +98,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
             fileList[0].originFileObj,
             "notes"
           );
-          values.file = fileUrl; // Update the file URL with the uploaded file
+          values.pdf_url = fileUrl; // Update file URL with uploaded file
         } catch (error) {
           console.error("Error uploading file:", error);
           message.error("Failed to upload file. Please try again.");
@@ -108,10 +108,17 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
         }
       } else if (currentFileUrl) {
         // If no new file was uploaded, keep the existing URL
-        values.file = currentFileUrl;
+        values.pdf_url = currentFileUrl;
       }
 
-      onSave({ ...values, id: note?.document_id });
+      const updatedValues = {
+        subject_id: values.subject,
+        topic_id: values.topic,
+        title: values.title,
+        pdf_url: values.pdf_url,
+      };
+
+      onSave({ ...updatedValues, id: note?.document_id });
       onCancel();
     } catch (error) {
       console.error("Form validation failed:", error);
@@ -142,8 +149,8 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
 
   // Set current file URL when note changes
   useEffect(() => {
-    if (note?.file) {
-      setCurrentFileUrl(note.file);
+    if (note?.pdf_url) {
+      setCurrentFileUrl(note.pdf_url);
     }
   }, [note]);
 
@@ -199,7 +206,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
                 className="h-[45px] rounded-lg font-400"
                 loading={!topic}
                 options={topic?.map((item: any) => ({
-                  label: item.name,
+                  label: item.title,
                   value: item.document_id,
                 }))}
                 value={selectedTopic}

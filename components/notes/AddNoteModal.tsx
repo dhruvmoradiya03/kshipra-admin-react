@@ -58,18 +58,30 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
 
   useEffect(() => {
     const topicList = topic || [];
-    const filtered = topicList.filter((t: any) =>
-      t.name.toLowerCase().includes(searchValue.toLowerCase())
-    );
+    console.log("Topic list in useEffect:", topicList);
+    console.log("Search value:", searchValue);
+    
+    const filtered = topicList.filter((t: any) => {
+      if (!t || !t.title) {
+        console.warn("Invalid topic item:", t);
+        return false;
+      }
+      return t.title.toLowerCase().includes(searchValue.toLowerCase());
+    });
+
+    console.log("Filtered topics:", filtered);
 
     const baseOptions = filtered.map((item: any) => ({
-      label: item.name,
+      label: item.title,
       value: item.document_id,
     }));
 
-    const exactMatch = topicList.some(
-      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
-    );
+    const exactMatch = topicList.some((t: any) => {
+      if (!t || !t.title) {
+        return false;
+      }
+      return t.title.toLowerCase() === searchValue.toLowerCase();
+    });
 
     if (searchValue && !exactMatch) {
       baseOptions.push({
@@ -140,14 +152,55 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
         }
       }
 
-      // Update values with the file URL and save
-      values.file = fileUrl;
+      // For new topics, we need to fetch the updated topic list
+      if (values.topic && values.topic.startsWith("NEW:")) {
+        try {
+          const updatedTopics = await getTopics(values.subject);
+          setTopic(updatedTopics);
+        } catch (err) {
+          console.error("Error fetching updated topics:", err);
+        }
+      }
+
+      // Debug: Log the values before creating the note
+      const formValues = form.getFieldsValue();
+      console.log("Form values:", formValues);
+      console.log("Creating note with values:", {
+        subject: values.subject,
+        subject_id: values.subject,
+        topic: values.topic,
+        topic_id: values.topic,
+        title: values.title,
+        pdf_url: fileUrl,
+        selectedSubject: selectedSubject,
+      });
+
+      // Validate that subject_id is not undefined
+      if (!values.subject && !formValues.subject) {
+        console.error("Subject is undefined in both values and form:", values.subject, formValues.subject);
+        message.error("Please select a subject");
+        return;
+      }
+
+      // Use the form value directly to ensure we get the correct subject
+      const subjectId = values.subject || formValues.subject;
+
+      // Update values with the correct field names and save
+      const updatedValues = {
+        subject_id: subjectId,
+        topic_id: values.topic,
+        title: values.title,
+        pdf_url: fileUrl,
+        order: 1,
+        is_active: true,
+        total_flashcards: 0,
+      };
 
       // Reset form and call onSave
       form.resetFields();
       setFileList([]);
       setCurrentFileUrl("");
-      onSave(values);
+      onSave(updatedValues);
     } catch (error: any) {
       console.error("Form submission failed:", error);
       if (!error.message.includes("Please provide either a file or a link")) {

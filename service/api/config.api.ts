@@ -8,6 +8,7 @@ import {
   updateDoc,
   doc,
   runTransaction,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 import { getStorage } from "firebase/storage";
@@ -23,18 +24,15 @@ interface Subject {
 
 interface Topic {
   id?: string;
-  subjectId: string;
-  subject_id?: string;
-  name: string;
-  title?: string;
-  normalizedName?: string;
-  order?: number;
-  is_active?: boolean;
-  notes_pdf_url?: string;
-  total_flashcards?: number;
-  document_id?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
+  subject_id: string;
+  title: string;
+  total_flashcards: number;
+  total_notes: number;
+  updated_at: string;
 }
 
 export const handleUpload = async (
@@ -178,22 +176,21 @@ export const postSeed = async () => {
 
       const timestamp = serverTimestamp();
       const nowIso = new Date().toISOString();
+      
+      const topicDocRef = doc(topicsRef);
       const topicData: Topic = {
-        subjectId: subject.id,
         subject_id: subject.id,
-        name: topic.name,
         title: topic.name,
-        normalizedName: topic.name.trim().toLowerCase(),
         order: nextOrder,
         is_active: true,
-        notes_pdf_url: "",
         total_flashcards: 0,
+        total_notes: 0,
         created_at: nowIso,
         updated_at: nowIso,
+        document_id: topicDocRef.id,
       };
 
-      const topicDocRef = await addDoc(topicsRef, topicData);
-      await updateDoc(topicDocRef, { document_id: topicDocRef.id });
+      await setDoc(topicDocRef, topicData);
     }
 
     for (const subject of addedSubjects) {
@@ -216,30 +213,15 @@ export const getTopics = async (subjectId: string) => {
   try {
     const topicsRef = collection(db, "topics");
 
-    // Try to get topics with subjectId field first (new structure)
+    // Try to get topics with subject_id field
     const querySnapshot = await getDocs(
-      query(topicsRef, where("subjectId", "==", subjectId))
+      query(topicsRef, where("subject_id", "==", subjectId))
     );
     
     let topics = querySnapshot.docs.map((doc) => ({
       document_id: doc.id,
       ...doc.data(),
     }));
-
-    // If no topics found with subjectId, try with subject_id (old structure)
-    if (topics.length === 0) {
-      console.log("No topics found with subjectId, trying subject_id field");
-      const oldQuerySnapshot = await getDocs(
-        query(topicsRef, where("subject_id", "==", subjectId))
-      );
-      
-      topics = oldQuerySnapshot.docs.map((doc) => ({
-        document_id: doc.id,
-        ...doc.data(),
-      }));
-      
-      console.log("Found topics with old structure:", topics.length);
-    }
 
     console.log("Final topics data:", topics);
     return topics;
@@ -252,7 +234,6 @@ export const getTopics = async (subjectId: string) => {
 export const createTopic = async (subjectId: string, name: string) => {
   try {
     const trimmedName = name.trim();
-    const normalizedName = trimmedName.toLowerCase();
 
     const topicsRef = collection(db, "topics");
     const subjectRef = doc(db, "subjects", subjectId);
@@ -260,8 +241,8 @@ export const createTopic = async (subjectId: string, name: string) => {
     // 🔎 Check for existing topic ONLY under this subject
     const q = query(
       topicsRef,
-      where("subjectId", "==", subjectId),
-      where("normalizedName", "==", normalizedName)
+      where("subject_id", "==", subjectId),
+      where("title", "==", trimmedName)
     );
 
     const snap = await getDocs(q);
@@ -291,15 +272,12 @@ export const createTopic = async (subjectId: string, name: string) => {
       const nowIso = new Date().toISOString();
 
       tx.set(newTopicRef, {
-        subjectId: subjectId, // Use consistent field name
-        subject_id: subjectId, // Keep for backward compatibility
-        name: trimmedName,
+        subject_id: subjectId,
         title: trimmedName,
-        normalizedName, 
         order: nextOrder,
         is_active: true,
-        notes_pdf_url: "",
         total_flashcards: 0,
+        total_notes: 0,
         created_at: nowIso,
         updated_at: nowIso,
         document_id: newTopicRef.id,
@@ -314,8 +292,8 @@ export const createTopic = async (subjectId: string, name: string) => {
     return {
       id: newTopicRef.id,
       document_id: newTopicRef.id,
-      subjectId,
-      name: trimmedName,
+      subject_id: subjectId,
+      title: trimmedName,
     };
   } catch (error) {
     console.error("Error creating topic:", error);
@@ -326,13 +304,16 @@ export const createTopic = async (subjectId: string, name: string) => {
 
 interface Note {
   id?: string;
-  subjectId: string;
-  topicId: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
+  pdf_url: string;
+  subject_id: string;
   title: string;
-  file: string;
-  isDeleted: boolean;
-  createdAt: any;
-  updatedAt: any;
+  topic_id: string;
+  total_flashcards: number;
+  updated_at: string;
 }
 
 export const postSeedNotes = async () => {
@@ -341,14 +322,14 @@ export const postSeedNotes = async () => {
     const topicsRef = collection(db, "topics");
     const topicsSnapshot = await getDocs(topicsRef);
 
-    // Create a map of topic names to their document data
-    const topicsMap = new Map<string, { id: string; subjectId: string }>();
+    // Create a map of topic titles to their document data
+    const topicsMap = new Map<string, { id: string; subject_id: string }>();
 
     topicsSnapshot.docs.forEach((doc) => {
       const topicData = doc.data();
-      topicsMap.set(topicData.name, {
+      topicsMap.set(topicData.title, {
         id: doc.id,
-        subjectId: topicData.subjectId,
+        subject_id: topicData.subject_id,
       });
     });
 
@@ -386,17 +367,22 @@ export const postSeedNotes = async () => {
       }
 
       try {
+        const nowIso = new Date().toISOString();
+        const noteDocRef = doc(notesRef);
         const noteData: Note = {
-          subjectId: topicInfo.subjectId,
-          topicId: topicInfo.id,
+          subject_id: topicInfo.subject_id,
+          topic_id: topicInfo.id,
           title: note.title,
-          file: note.file,
-          isDeleted: false,
-          createdAt: timestamp,
-          updatedAt: timestamp,
+          pdf_url: note.file,
+          order: 1,
+          is_active: true,
+          total_flashcards: 0,
+          created_at: nowIso,
+          updated_at: nowIso,
+          document_id: noteDocRef.id,
         };
 
-        await addDoc(notesRef, noteData);
+        await setDoc(noteDocRef, noteData);
         successCount++;
       } catch (error) {
         console.error(`Error adding note "${note.title}":`, error);

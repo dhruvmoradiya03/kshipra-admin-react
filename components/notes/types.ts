@@ -1,11 +1,15 @@
 export interface Note {
-  id?: number;
-  subject: number;
-  topic: number;
+  id?: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
+  pdf_url: string;
+  subject_id: string;
   title: string;
-  file: string;
-  description?: string;
-  date?: string;
+  topic_id: string;
+  total_flashcards: number;
+  updated_at: string;
 }
 
 export interface Subject {
@@ -14,7 +18,14 @@ export interface Subject {
 }
 
 export interface Topic {
-  id: number;
-  name: string;
-  subject: number;
+  id: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
+  order: number;
+  subject_id: string;
+  title: string;
+  total_flashcards: number;
+  total_notes: number;
+  updated_at: string;
 }

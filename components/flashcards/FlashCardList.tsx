@@ -69,16 +69,16 @@ const useNoteTitles = (noteIds: string[]) => {
 
 interface Flashcard {
   id: string;
-  subjectId: string;
-  topicId: string;
-  noteId: string;
-  questionTitle?: string;
+  subject_id: string;
+  topic_id: string;
+  note_id: string;
+  question_title?: string;
   question: string;
-  answerTitle?: string;
+  answer_title?: string;
   answer: string;
   category: string;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 interface FlashCardListProps {
@@ -103,8 +103,8 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
   const noteIds = useMemo(() => {
     const ids = new Set<string>();
     flashcards.forEach((card) => {
-      if (card.noteId) {
-        ids.add(card.noteId);
+      if (card.note_id) {
+        ids.add(card.note_id);
       }
     });
     return Array.from(ids);
@@ -114,7 +114,7 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
   const columns = [
     {
       title: "Note Title",
-      dataIndex: ["noteId"],
+      dataIndex: ["note_id"],
       key: "noteTitle",
       width: "24%",
       render: (noteId: string) => {
@@ -131,7 +131,7 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
     },
     {
       title: "Question Title",
-      dataIndex: "questionTitle",
+      dataIndex: "question_title",
       key: "questionTitle",
       width: "18%",
       render: (text: string) => (
@@ -153,7 +153,7 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
     },
     {
       title: "Answer Title",
-      dataIndex: "answerTitle",
+      dataIndex: "answer_title",
       key: "answerTitle",
       width: "18%",
       render: (text: string) => (
@@ -167,18 +167,6 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       dataIndex: "answer",
       key: "answer",
       width: "24%",
-      render: (text: string, record: Flashcard) => (
-        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
-          {text}
-        </Text>
-      ),
-    },
-
-    {
-      title: "Category",
-      dataIndex: "category",
-      key: "category",
-      width: "14%",
       render: (text: string, record: Flashcard) => (
         <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
           {text}

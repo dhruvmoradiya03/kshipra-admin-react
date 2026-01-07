@@ -12,8 +12,8 @@ interface Subject {
 
 interface Topic {
   id: string;
-  name: string;
-  subjectId: string;
+  title: string;
+  subject_id: string;
 }
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
@@ -139,17 +139,17 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
   useEffect(() => {
     const topicList = topic || [];
     const filtered = topicList.filter((t: any) =>
-      t.name.toLowerCase().includes(searchValue.toLowerCase())
+      t.title.toLowerCase().includes(searchValue.toLowerCase())
     );
 
     const baseOptions = filtered.map((item: any) => ({
-      label: item.name,
+      label: item.title,
       value: item.document_id,
       topicId: item.document_id,
     }));
 
     const exactMatch = topicList.some(
-      (t: any) => t.name.toLowerCase() === searchValue.toLowerCase()
+      (t: any) => t.title.toLowerCase() === searchValue.toLowerCase()
     );
 
     if (searchValue && !exactMatch) {
@@ -252,10 +252,10 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
           const newNoteTitle = values.note.substring(4);
           try {
             const newNote = await addNote({
-              subjectId: values.subject,
-              topicId: values.topic, // Note: if topic was new, it should be the new ID by now
+              subject_id: values.subject,
+              topic_id: values.topic, // Note: if topic was new, it should be the new ID by now
               title: newNoteTitle,
-              file: "", // Placeholder or handle as needed
+              pdf_url: "", // Placeholder or handle as needed
             });
             noteId = newNote.document_id;
             console.log(`Note "${newNoteTitle}" created successfully`);
@@ -429,25 +429,7 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
           </div>
         </Form.Item>
 
-        <Form.Item
-          name="category"
-          label="Category"
-          rules={[{ required: true, message: "Add Category" }]}
-          className={`font-medium text-[#1E4640] ${worksans.className}`}
-        >
-          <div className="flex gap-3">
-            <Input
-              placeholder="Add Category"
-              style={{
-                height: 45,
-                borderRadius: 8,
-                fontFamily: "Work Sans",
-                fontWeight: 400,
-              }}
-            />
-          </div>
-        </Form.Item>
-
+        
         {/* FOOTER BUTTONS */}
         <div className={`flex justify-end gap-4 mt-8 ${worksans.className}`}>
           <Button

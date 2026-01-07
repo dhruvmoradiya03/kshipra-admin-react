@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   where,
   getCountFromServer,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
@@ -31,49 +32,92 @@ const updateTopicNotesPdfUrl = async (topicId: string, fileUrl: unknown) => {
   });
 };
 
+const updateTopicNotesCount = async (topicId: string, increment: number = 1) => {
+  if (typeof topicId !== "string" || !topicId.trim() || topicId === "unknown_topic") {
+    return;
+  }
+
+  try {
+    const topicRef = doc(db, "topics", topicId);
+    await updateDoc(topicRef, {
+      total_notes: increment,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error updating topic notes count:", error);
+  }
+};
+
 export interface Note {
   id?: string;
-  subjectId: string;
-  topicId: string;
-  title: string;
-  file: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
   isDeleted: boolean;
-  createdAt: any;
-  updatedAt: any;
+  order: number;
+  pdf_url: string;
+  subject_id: string;
+  title: string;
+  topic_id: string;
+  total_flashcards: number;
+  updated_at: string;
 }
 
 // Add a new note
 export const addNote = async (noteData: any) => {
   try {
-    const timestamp = serverTimestamp();
+    const nowIso = new Date().toISOString();
+    const docRef = doc(collection(db, "notes"));
 
-    // Step 1: Create the document
-    const docRef = await addDoc(collection(db, "notes"), {
-      subjectId: noteData.subjectId,
-      topicId: noteData.topicId,
-      title: noteData.title,
-      file: noteData.file,
+    const dataToSave = {
+      subject_id: noteData.subject_id ?? "unknown_subject",
+      topic_id: noteData.topic_id ?? "unknown_topic",
+      title: noteData.title ?? "Untitled",
+      pdf_url: noteData.pdf_url ?? null, // Firebase accepts null, but not undefined
+      order: noteData.order || 1,
+      is_active: true,
       isDeleted: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
-
-    // Step 2: Immediately update the new document with document_id
-    await updateDoc(docRef, {
+      total_flashcards: 0,
+      created_at: nowIso,
+      updated_at: nowIso,
       document_id: docRef.id,
-    });
+    };
 
-    await updateTopicNotesPdfUrl(noteData.topicId, noteData.file);
+    console.log("Final data being sent to Firestore:", dataToSave);
+
+    await setDoc(docRef, dataToSave);
+
+    // Update topic's PDF URL and notes count
+    await updateTopicNotesPdfUrl(noteData.topic_id, noteData.pdf_url);
+    
+    // Get current topic to increment total_notes
+    if (noteData.topic_id && noteData.topic_id !== "unknown_topic") {
+      try {
+        const topicRef = doc(db, "topics", noteData.topic_id);
+        const topicSnap = await getDoc(topicRef);
+        
+        if (topicSnap.exists()) {
+          const topicData = topicSnap.data();
+          const currentTotalNotes = topicData.total_notes || 0;
+          await updateDoc(topicRef, {
+            total_notes: currentTotalNotes + 1,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error("Error updating topic notes count:", error);
+      }
+    }
 
     return {
       id: docRef.id,
-      subjectId: noteData.subjectId,
-      topicId: noteData.topicId,
+      subject_id: noteData.subject_id,
+      topic_id: noteData.topic_id,
       title: noteData.title,
-      file: noteData.file,
+      pdf_url: noteData.pdf_url,
       document_id: docRef.id,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      created_at: nowIso,
+      updated_at: nowIso,
     };
   } catch (error) {
     console.error("Error adding note:", error);
@@ -88,14 +132,14 @@ export const updateNote = async (noteId: string, updateData: any) => {
 
     console.log(updateData, "this is update data");
     await updateDoc(noteRef, {
-      subjectId: updateData.subjectId,
-      topicId: updateData.topicId,
+      subject_id: updateData.subject_id,
+      topic_id: updateData.topic_id,
       title: updateData.title,
-      file: updateData.file,
-      updatedAt: serverTimestamp(),
+      pdf_url: updateData.pdf_url,
+      updated_at: new Date().toISOString(),
     });
 
-    await updateTopicNotesPdfUrl(updateData.topicId, updateData.file);
+    await updateTopicNotesPdfUrl(updateData.topic_id, updateData.pdf_url);
     return { id: noteId, ...updateData };
   } catch (error) {
     console.error("Error updating note:", error);
@@ -107,10 +151,40 @@ export const updateNote = async (noteId: string, updateData: any) => {
 export const deleteNote = async (noteId: string) => {
   try {
     const noteRef = doc(db, "notes", noteId);
+    
+    // Get note data before deletion to update topic count
+    const noteSnap = await getDoc(noteRef);
+    if (noteSnap.exists()) {
+      const noteData = noteSnap.data();
+      
+      // Update topic's total_notes count
+      if (noteData.topic_id && noteData.topic_id !== "unknown_topic") {
+        try {
+          const topicRef = doc(db, "topics", noteData.topic_id);
+          const topicSnap = await getDoc(topicRef);
+          
+          if (topicSnap.exists()) {
+            const topicData = topicSnap.data();
+            const currentTotalNotes = topicData.total_notes || 0;
+            const newTotalNotes = Math.max(0, currentTotalNotes - 1); // Prevent negative values
+            
+            await updateDoc(topicRef, {
+              total_notes: newTotalNotes,
+              updated_at: new Date().toISOString(),
+            });
+          }
+        } catch (error) {
+          console.error("Error updating topic notes count on deletion:", error);
+        }
+      }
+    }
+    
+    // Soft delete the note using isDeleted field
     await updateDoc(noteRef, {
       isDeleted: true,
-      updatedAt: serverTimestamp(),
+      updated_at: new Date().toISOString(),
     });
+    
     return { success: true };
   } catch (error) {
     console.error("Error deleting note:", error);
@@ -129,7 +203,7 @@ export const getNotes = async (
     let q = query(
       notesRef,
       where("isDeleted", "==", false),
-      orderBy("createdAt", "desc"),
+      orderBy("created_at", "desc"),
       limit(pageSize)
     );
 
@@ -137,7 +211,7 @@ export const getNotes = async (
       q = query(
         notesRef,
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         startAfter(lastVisible),
         limit(pageSize)
       );
@@ -198,7 +272,7 @@ export const getNotesBySubjectId = async (
     if (searchQuery && searchQuery.trim() !== "") {
       const countQuery = query(
         notesRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
         where("title", ">=", searchQuery),
         where("title", "<=", searchQuery + "\uf8ff")
@@ -212,11 +286,11 @@ export const getNotesBySubjectId = async (
         console.log("this is if");
         q = query(
           notesRef,
-          where("subjectId", "==", subjectId),
+          where("subject_id", "==", subjectId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
           where("isDeleted", "==", false),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           limit(pageSize)
         );
         console.log(q, "this is q");
@@ -224,11 +298,11 @@ export const getNotesBySubjectId = async (
         console.log("this is else");
         q = query(
           notesRef,
-          where("subjectId", "==", subjectId),
+          where("subject_id", "==", subjectId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
           where("isDeleted", "==", false),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
         );
@@ -256,7 +330,7 @@ export const getNotesBySubjectId = async (
 
     const countQuery = query(
       notesRef,
-      where("subjectId", "==", subjectId),
+      where("subject_id", "==", subjectId),
       where("isDeleted", "==", false)
     );
     const totalSnap = await getCountFromServer(countQuery);
@@ -266,17 +340,17 @@ export const getNotesBySubjectId = async (
     if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         notesRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         limit(pageSize)
       );
     } else {
       q = query(
         notesRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );
@@ -320,7 +394,7 @@ export const getNotesByTopicId = async (
     if (searchQuery && searchQuery.trim() !== "") {
       const countQuery = query(
         notesRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
         where("title", ">=", searchQuery),
         where("title", "<=", searchQuery + "\uf8ff")
@@ -333,21 +407,21 @@ export const getNotesByTopicId = async (
       if (page === 1 || !lastVisibleDocs[page - 1]) {
         q = query(
           notesRef,
-          where("topicId", "==", topicId),
+          where("topic_id", "==", topicId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
           where("isDeleted", "==", false),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           limit(pageSize)
         );
       } else {
         q = query(
           notesRef,
-          where("topicId", "==", topicId),
+          where("topic_id", "==", topicId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
           where("isDeleted", "==", false),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
         );
@@ -374,7 +448,7 @@ export const getNotesByTopicId = async (
 
     const countQuery = query(
       notesRef,
-      where("topicId", "==", topicId),
+      where("topic_id", "==", topicId),
       where("isDeleted", "==", false)
     );
 
@@ -385,17 +459,17 @@ export const getNotesByTopicId = async (
     if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         notesRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         limit(pageSize)
       );
     } else {
       q = query(
         notesRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );

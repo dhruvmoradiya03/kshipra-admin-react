@@ -20,30 +20,31 @@ import * as XLSX from "xlsx";
 
 export interface Flashcard {
   id?: string;
-  subjectId: string;
-  topicId: string;
-  noteId: string;
-  questionTitle: string;
-  question: string;
-  answerTitle: string;
   answer: string;
-  category: string;
+  answer_title: string;
+  created_at: string;
+  document_id: string;
+  is_active: boolean;
   isDeleted: boolean;
-  createdAt: any;
-  updatedAt: any;
-  document_id?: string;
+  note_id: string;
+  order: number;
+  question: string;
+  question_title: string;
+  subject_id: string;
+  topic_id: string;
+  updated_at: string;
 }
 
 // Add a new flashcard
 export const addFlashcard = async (
   flashcardData: Omit<
     Flashcard,
-    "id" | "isDeleted" | "createdAt" | "updatedAt" | "document_id"
+    "id" | "created_at" | "updated_at" | "document_id"
   >
 ) => {
   try {
-    const timestamp = serverTimestamp();
-    const topicRef = doc(db, "topics", flashcardData.topicId);
+    const nowIso = new Date().toISOString();
+    const topicRef = doc(db, "topics", flashcardData.topic_id);
 
     // Use transaction to ensure atomicity
     let newFlashcardRef: any;
@@ -63,24 +64,25 @@ export const addFlashcard = async (
       newFlashcardRef = doc(collection(db, "flashcards"));
       
       tx.set(newFlashcardRef, {
-        subjectId: flashcardData.subjectId,
-        topicId: flashcardData.topicId,
-        noteId: flashcardData.noteId,
-        questionTitle: flashcardData.questionTitle,
+        subject_id: flashcardData.subject_id,
+        topic_id: flashcardData.topic_id,
+        note_id: flashcardData.note_id,
+        question_title: flashcardData.question_title,
         question: flashcardData.question,
-        answerTitle: flashcardData.answerTitle,
+        answer_title: flashcardData.answer_title,
         answer: flashcardData.answer,
-        category: flashcardData.category,
+        order: flashcardData.order || 1,
+        is_active: true,
         isDeleted: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        created_at: nowIso,
+        updated_at: nowIso,
         document_id: newFlashcardRef.id,
       });
 
       // Update the topic's total_flashcards count
       tx.update(topicRef, {
         total_flashcards: newTotalFlashcards,
-        updatedAt: timestamp,
+        updated_at: nowIso,
       });
     });
 
@@ -88,9 +90,9 @@ export const addFlashcard = async (
       id: newFlashcardRef.id,
       ...flashcardData,
       document_id: newFlashcardRef.id,
-      isDeleted: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      is_active: true,
+      created_at: nowIso,
+      updated_at: nowIso,
     };
   } catch (error) {
     console.error("Error adding flashcard:", error);
@@ -101,7 +103,7 @@ export const addFlashcard = async (
 const normalize = (value: unknown): string => String(value ?? "").trim();
 const normalizeKey = (value: unknown): string => normalize(value).toLowerCase();
 
-const REQUIRED_HEADERS = ["note title", "question title", "question", "answer title", "answer", "category"];
+const REQUIRED_HEADERS = ["note title", "question title", "question", "answer title", "answer"];
 
 interface BulkUploadResult {
   totalCount: number;
@@ -184,21 +186,32 @@ export const uploadFlashcardsFromExcel = async (
   const notesSnapshot = await getDocs(
     query(
       collection(db, "notes"),
-      where("subjectId", "==", subjectId),
-      where("topicId", "==", topicId),
+      where("subject_id", "==", subjectId),
+      where("topic_id", "==", topicId),
       where("isDeleted", "==", false)
     )
   );
+
+  console.log("Fetching notes for subject:", subjectId, "topic:", topicId);
+  console.log("Found notes count:", notesSnapshot.size);
 
   const noteMap = new Map<string, { id: string; title: string }>();
   notesSnapshot.forEach((noteDoc) => {
     const data = noteDoc.data() as { title?: string };
     const normalizedTitle = normalize(data.title);
+    console.log("Note found:", {
+      id: noteDoc.id,
+      originalTitle: data.title,
+      normalizedTitle: normalizedTitle,
+      normalizedKey: normalizeKey(normalizedTitle)
+    });
     noteMap.set(normalizeKey(normalizedTitle), {
       id: noteDoc.id,
       title: normalizedTitle,
     });
   });
+
+  console.log("Note map keys:", Array.from(noteMap.keys()));
 
   let successCount = 0;
   const topicRef = doc(db, "topics", topicId);
@@ -218,7 +231,7 @@ export const uploadFlashcardsFromExcel = async (
       const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
         normalize(row[index])
       );
-      const [noteTitle, questionTitle, question, answerTitle, answer, category] = normalizedCells;
+      const [noteTitle, questionTitle, question, answerTitle, answer] = normalizedCells;
 
       console.log("Processing row:", {
         originalRow: row,
@@ -228,23 +241,26 @@ export const uploadFlashcardsFromExcel = async (
         question,
         answerTitle,
         answer,
-        category
       });
 
-      if (!noteTitle || !question || !answer || !category || !questionTitle || !answerTitle) {
+      if (!noteTitle || !question || !answer || !questionTitle || !answerTitle) {
         console.log("Skipping row - missing required fields:", {
           noteTitle: !!noteTitle,
           questionTitle: !!questionTitle,
           question: !!question,
           answerTitle: !!answerTitle,
-          answer: !!answer,
-          category: !!category
+          answer: !!answer
         });
         continue;
       }
 
       const note = noteMap.get(normalizeKey(noteTitle));
-      console.log("Looking for note:", noteTitle, "found:", note);
+      console.log("Looking for note:", {
+        searchTitle: noteTitle,
+        searchKey: normalizeKey(noteTitle),
+        found: note,
+        availableKeys: Array.from(noteMap.keys())
+      });
       if (!note) {
         console.log("Skipping row - note not found:", noteTitle);
         console.log("Available notes:", Array.from(noteMap.keys()));
@@ -252,21 +268,22 @@ export const uploadFlashcardsFromExcel = async (
       }
 
       try {
-        const timestamp = serverTimestamp();
+        const nowIso = new Date().toISOString();
         const docRef = doc(collection(db, "flashcards"));
         
         tx.set(docRef, {
-          subjectId,
-          topicId,
-          noteId: note.id,
+          subject_id: subjectId,
+          topic_id: topicId,
+          note_id: note.id,
           question,
-          questionTitle,
-          answerTitle,
+          question_title: questionTitle,
+          answer_title: answerTitle,
           answer,
-          category,
+          order: 1,
+          is_active: true,
           isDeleted: false,
-          createdAt: timestamp,
-          updatedAt: timestamp,
+          created_at: nowIso,
+          updated_at: nowIso,
           document_id: docRef.id,
         });
 
@@ -279,7 +296,7 @@ export const uploadFlashcardsFromExcel = async (
     // Update the topic's total_flashcards count
     tx.update(topicRef, {
       total_flashcards: currentTotalFlashcards + successCount,
-      updatedAt: serverTimestamp(),
+      updated_at: new Date().toISOString(),
     });
   });
 
@@ -298,7 +315,7 @@ export const uploadFlashcardsFromExcel = async (
 export const updateFlashcard = async (
   flashcardId: string,
   updateData: Partial<
-    Omit<Flashcard, "id" | "createdAt" | "updatedAt" | "document_id">
+    Omit<Flashcard, "id" | "created_at" | "updated_at" | "document_id">
   >
 ) => {
   try {
@@ -306,7 +323,7 @@ export const updateFlashcard = async (
 
     await updateDoc(flashcardRef, {
       ...updateData,
-      updatedAt: serverTimestamp(),
+      updated_at: new Date().toISOString(),
     });
 
     return { id: flashcardId, ...updateData };
@@ -319,7 +336,7 @@ export const updateFlashcard = async (
 // Soft delete a flashcard
 export const deleteFlashcard = async (flashcardId: string) => {
   try {
-    const timestamp = serverTimestamp();
+    const nowIso = new Date().toISOString();
     const flashcardRef = doc(db, "flashcards", flashcardId);
 
     // Use transaction to ensure atomicity
@@ -331,7 +348,7 @@ export const deleteFlashcard = async (flashcardId: string) => {
       }
 
       const flashcardData = flashcardSnap.data();
-      const topicId = flashcardData.topicId;
+      const topicId = flashcardData.topic_id;
       const topicRef = doc(db, "topics", topicId);
 
       // Get the current topic data
@@ -347,13 +364,13 @@ export const deleteFlashcard = async (flashcardId: string) => {
       // Soft delete the flashcard
       tx.update(flashcardRef, {
         isDeleted: true,
-        updatedAt: timestamp,
+        updated_at: nowIso,
       });
 
       // Update the topic's total_flashcards count
       tx.update(topicRef, {
         total_flashcards: newTotalFlashcards,
-        updatedAt: timestamp,
+        updated_at: nowIso,
       });
     });
 
@@ -394,7 +411,7 @@ export const getFlashcardsBySubjectId = async (
     if (searchQuery && searchQuery.trim() !== "") {
       const countQuery = query(
         flashcardsRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
         where("question", ">=", searchQuery),
         where("question", "<=", searchQuery + "\uf8ff")
@@ -406,21 +423,21 @@ export const getFlashcardsBySubjectId = async (
       if (page === 1 || !lastVisibleDocs[page - 1]) {
         q = query(
           flashcardsRef,
-          where("subjectId", "==", subjectId),
+          where("subject_id", "==", subjectId),
           where("isDeleted", "==", false),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           limit(pageSize)
         );
       } else {
         q = query(
           flashcardsRef,
-          where("subjectId", "==", subjectId),
+          where("subject_id", "==", subjectId),
           where("isDeleted", "==", false),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
         );
@@ -445,7 +462,7 @@ export const getFlashcardsBySubjectId = async (
     // Get total matching documents
     const countQuery = query(
       flashcardsRef,
-      where("subjectId", "==", subjectId),
+      where("subject_id", "==", subjectId),
       where("isDeleted", "==", false)
     );
     const totalSnap = await getCountFromServer(countQuery);
@@ -455,17 +472,17 @@ export const getFlashcardsBySubjectId = async (
     if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         flashcardsRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         limit(pageSize)
       );
     } else {
       q = query(
         flashcardsRef,
-        where("subjectId", "==", subjectId),
+        where("subject_id", "==", subjectId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );
@@ -502,7 +519,7 @@ export const getFlashcardCountByNoteId = async (
 
     const q = query(
       collection(db, "flashcards"),
-      where("noteId", "==", noteId),
+      where("note_id", "==", noteId),
       where("isDeleted", "==", false)
     );
 
@@ -527,7 +544,7 @@ export const getFlashcardsByTopicId = async (
     if (searchQuery && searchQuery.trim() !== "") {
       const countQuery = query(
         flashcardsRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
         where("question", ">=", searchQuery),
         where("question", "<=", searchQuery + "\uf8ff")
@@ -539,21 +556,21 @@ export const getFlashcardsByTopicId = async (
       if (page === 1 || !lastVisibleDocs[page - 1]) {
         q = query(
           flashcardsRef,
-          where("topicId", "==", topicId),
+          where("topic_id", "==", topicId),
           where("isDeleted", "==", false),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           limit(pageSize)
         );
       } else {
         q = query(
           flashcardsRef,
-          where("topicId", "==", topicId),
+          where("topic_id", "==", topicId),
           where("isDeleted", "==", false),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
-          orderBy("createdAt", "desc"),
+          orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
         );
@@ -579,7 +596,7 @@ export const getFlashcardsByTopicId = async (
     // Get total matching documents
     const countQuery = query(
       flashcardsRef,
-      where("topicId", "==", topicId),
+      where("topic_id", "==", topicId),
       where("isDeleted", "==", false)
     );
     const totalSnap = await getCountFromServer(countQuery);
@@ -589,17 +606,17 @@ export const getFlashcardsByTopicId = async (
     if (page === 1 || !lastVisibleDocs[page - 1]) {
       q = query(
         flashcardsRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         limit(pageSize)
       );
     } else {
       q = query(
         flashcardsRef,
-        where("topicId", "==", topicId),
+        where("topic_id", "==", topicId),
         where("isDeleted", "==", false),
-        orderBy("createdAt", "desc"),
+        orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
       );

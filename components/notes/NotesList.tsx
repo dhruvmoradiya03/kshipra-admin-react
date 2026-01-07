@@ -67,8 +67,8 @@ const NotesList: React.FC<NotesListProps> = ({
     },
     {
       title: "PDF File",
-      dataIndex: "file",
-      key: "file",
+      dataIndex: "pdf_url",
+      key: "pdf_url",
       render: (text: string, record: Note) => {
         // Extract filename from path (assuming format: '.../notes/filename.ext')
         const getFileNameFromUrl = (url: string) => {
@@ -76,7 +76,7 @@ const NotesList: React.FC<NotesListProps> = ({
             // Strip query params/hashes
             const cleanUrl = url.split(/[?#]/)[0];
 
-            // Decode entire URL first (turns %2F into real '/')
+            // Decode URI components
             const decoded = decodeURIComponent(cleanUrl);
 
             // Now split by slash and get the last part

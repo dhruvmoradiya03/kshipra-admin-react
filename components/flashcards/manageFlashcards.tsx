@@ -246,14 +246,16 @@ const ManageFlashcards = () => {
     try {
       setLoading(true);
       const response = await addFlashcard({
-        subjectId: values.subject,
-        topicId: values.topic,
-        noteId: values.note,
-        questionTitle: values.questionTitle,
+        subject_id: values.subject,
+        topic_id: values.topic,
+        note_id: values.note,
+        question_title: values.questionTitle,
         question: values.question,
-        answerTitle: values.answerTitle,
+        answer_title: values.answerTitle,
         answer: values.answer,
-        category: values.category,
+        order: 1,
+        is_active: true,
+        isDeleted: false,
       });
 
       console.log(response, "this is response");
@@ -503,7 +505,7 @@ const ManageFlashcards = () => {
                     console.log("Mapping topic item:", item);
                     return {
                       key: item.document_id,
-                      label: item.name,
+                      label: item.title || item.name || "Untitled Topic",
                     };
                   }),
                   selectable: true,

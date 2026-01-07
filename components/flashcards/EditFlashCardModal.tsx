@@ -16,20 +16,19 @@ interface Subject {
 
 interface Topic {
   id: string;
-  name: string;
-  subjectId: string;
+  title: string;
+  subject_id: string;
 }
 
 interface Flashcard {
   id: string;
-  subjectId: string;
-  topicId: string;
-  noteId: string;
-  questionTitle: string;
+  subject_id: string;
+  topic_id: string;
+  note_id: string;
+  question_title: string;
   question: string;
-  answerTitle: string;
+  answer_title: string;
   answer: string;
-  category: string;
 }
 
 interface EditFlashCardModalProps {
@@ -117,19 +116,18 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
   useEffect(() => {
     if (visible && flashcard) {
       // Set the selected subject and topic
-      setSelectedSubject(flashcard.subjectId);
-      setSelectedTopic(flashcard.topicId);
+      setSelectedSubject(flashcard.subject_id);
+      setSelectedTopic(flashcard.topic_id);
 
       // Set form values
       form.setFieldsValue({
-        subjectId: flashcard.subjectId,
-        topicId: flashcard.topicId,
-        noteId: flashcard.noteId,
-        questionTitle: flashcard.questionTitle,
+        subject: flashcard.subject_id,
+        topic: flashcard.topic_id,
+        note: flashcard.note_id,
+        questionTitle: flashcard.question_title,
         question: flashcard.question,
-        answerTitle: flashcard.answerTitle,
+        answerTitle: flashcard.answer_title,
         answer: flashcard.answer,
-        category: flashcard.category || "",
       });
     } else {
       // Reset form and states when modal is closed
@@ -145,20 +143,20 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
     setSelectedTopic(null);
     setNotes([]);
     form.setFieldsValue({
-      topicId: undefined,
-      noteId: undefined,
+      topic: undefined,
+      note: undefined,
     });
   };
 
   const handleTopicChange = (topicId: string) => {
     setSelectedTopic(topicId);
-    form.setFieldsValue({ noteId: undefined });
+    form.setFieldsValue({ note: undefined });
 
     // Update current topic title
     const selected = topics.find(
       (t) => t.document_id === topicId || t.id === topicId
     );
-    setCurrentTopicTitle(selected?.name || "");
+    setCurrentTopicTitle(selected?.title || "");
   };
 
   const handleSubmit = async () => {
@@ -195,7 +193,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         <Row gutter={20}>
           <Col span={12}>
             <Form.Item
-              name="subjectId"
+              name="subject"
               label="Subject"
               rules={[{ required: true, message: "Please select subject" }]}
               className={`font-medium text-[#1E4640] ${worksans.className}`}
@@ -214,7 +212,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
 
           <Col span={12}>
             <Form.Item
-              name="topicId"
+              name="topic"
               label="Topic"
               rules={[{ required: true, message: "Please select topic" }]}
               className={`font-medium text-[#1E4640] ${worksans.className}`}
@@ -225,7 +223,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
                 onChange={handleTopicChange}
                 loading={!selectedSubject}
                 options={topics?.map((item: any) => ({
-                  label: item.name,
+                  label: item.title,
                   value: item.document_id || item.id,
                 }))}
               />
@@ -236,7 +234,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         <Row gutter={20}>
           <Col className="w-full">
             <Form.Item
-              name="noteId"
+              name="note"
               label="Select Note"
               rules={[{ required: true, message: "Please select a note" }]}
               className={`font-medium text-[#1E4640] ${worksans.className}`}
@@ -325,22 +323,6 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
           />
         </Form.Item>
 
-        <Form.Item
-          name="category"
-          label="Category"
-          rules={[{ required: true, message: "Please enter a category" }]}
-          className={`font-medium text-[#1E4640] ${worksans.className}`}
-        >
-          <Input
-            placeholder="Add Category"
-            style={{
-              height: 45,
-              borderRadius: 8,
-              fontFamily: "Work Sans",
-              fontWeight: 400,
-            }}
-          />
-        </Form.Item>
       </Form>
 
       {/* FOOTER BUTTONS */}

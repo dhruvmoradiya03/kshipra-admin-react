@@ -184,7 +184,14 @@ const ManageNotes = () => {
       const topics = await getTopics(selectedSubject);
 
       console.log("Raw topics data:", topics);
-      console.log("Topics structure:", topics.map((t: any) => ({ id: t.document_id, name: t.name, hasDocumentId: !!t.document_id })));
+      console.log(
+        "Topics structure:",
+        topics.map((t: any) => ({
+          id: t.document_id,
+          name: t.name,
+          hasDocumentId: !!t.document_id,
+        }))
+      );
       setTopic(topics);
     } catch (error) {
       console.error("Error fetching topics:", error);
@@ -229,29 +236,30 @@ const ManageNotes = () => {
   };
 
   const handleAddNote = async (values: any) => {
+    // Mapping the form values to the exact keys expected by notes.api.ts
+    console.log("Values received in handleAddNote:", values);
     const newNote = {
-      subjectId: values.subject,
-      topicId: values.topic,
+      subject_id: values.subject_id,
+      topic_id: values.topic_id,
       title: values.title,
-      file: values.file || null,
+      pdf_url: values.pdf_url,
     };
 
     try {
       setLoading(true);
+      // Now result will receive subject_id correctly
       const result = await addNote(newNote);
+
       setSuccessMessage("Note added successfully.");
       setErrorMessage(null);
       setIsSuccessAlertOpen(true);
-      setIsErrorAlertOpen(false);
       setIsAddModalVisible(false);
     } catch (error) {
       console.error("Error adding note:", error);
       const message =
         error instanceof Error ? error.message : "Failed to add note.";
       setErrorMessage(message);
-      setSuccessMessage(null);
       setIsErrorAlertOpen(true);
-      setIsSuccessAlertOpen(false);
     } finally {
       setLoading(false);
     }
@@ -261,10 +269,10 @@ const ManageNotes = () => {
 
   const handleEditNote = async (values: any) => {
     const updatedNote = {
-      subjectId: values.subject,
-      topicId: values.topic,
+      subject_id: values.subject_id,
+      topic_id: values.topic_id,
       title: values.title,
-      file: values.file,
+      pdf_url: values.pdf_url,
     };
 
     try {
@@ -436,7 +444,7 @@ const ManageNotes = () => {
                 menu={{
                   items: topic.map((item: any) => ({
                     key: item.document_id,
-                    label: item.name,
+                    label: item.title || item.name || "Untitled Topic",
                   })),
                   selectable: true,
                   disabled: !selectedSubject,
@@ -451,8 +459,8 @@ const ManageNotes = () => {
                     setSelectedTopic(e.key);
                   },
                   style: {
-                    maxHeight: 618, 
-                    overflowY: "auto", 
+                    maxHeight: 618,
+                    overflowY: "auto",
                   },
                 }}
                 trigger={["click"]}
