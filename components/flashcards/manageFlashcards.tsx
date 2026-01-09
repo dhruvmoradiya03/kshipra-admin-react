@@ -481,7 +481,7 @@ const ManageFlashcards = () => {
                   selectable: true,
                   onSelect: (e) => handleSubjectChange(e.key),
                   style: {
-                    maxHeight: 618,
+                    maxHeight: 550,
                     overflowY: "auto",
                   },
                 }}
@@ -514,7 +514,7 @@ const ManageFlashcards = () => {
                     setSelectedTopic(e.key);
                   },
                   style: {
-                    maxHeight: 618,
+                    maxHeight: 550,
                     overflowY: "auto",
                   },
                 }}

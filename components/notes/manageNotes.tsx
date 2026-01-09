@@ -422,14 +422,14 @@ const ManageNotes = () => {
                   selectable: true,
                   onSelect: (e) => handleSubjectChange(e.key),
                   style: {
-                    maxHeight: 618, // 👈 control height here
-                    overflowY: "auto", // 👈 enable vertical scroll
+                    maxHeight: 550, 
+                    overflowY: "auto", 
                   },
                 }}
                 trigger={["click"]}
                 overlayClassName="w-[200px]"
               >
-                <div className="flex items-center justify-between w-[200px] border border-gray-300 rounded-xl py-3 px-4 text-[#1E4640] bg-white cursor-pointer hover:border-[#1E4640] transition-colors">
+                <div className="flex items-center justify-between w-[230px] border border-gray-300 rounded-xl py-3 px-4 text-[#1E4640] bg-white cursor-pointer hover:border-[#1E4640] transition-colors">
                   <span>
                     {selectedSubject
                       ? subject.find(
@@ -459,7 +459,7 @@ const ManageNotes = () => {
                     setSelectedTopic(e.key);
                   },
                   style: {
-                    maxHeight: 618,
+                    maxHeight: 550,
                     overflowY: "auto",
                   },
                 }}
@@ -467,7 +467,7 @@ const ManageNotes = () => {
                 overlayClassName="w-[200px]"
               >
                 <div
-                  className={`flex items-center justify-between w-[200px] border ${
+                  className={`flex items-center justify-between w-[230px] border ${
                     !selectedSubject
                       ? "border-gray-200"
                       : "border-gray-300 hover:border-[#1E4640]"

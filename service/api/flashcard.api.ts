@@ -261,6 +261,23 @@ export const uploadFlashcardsFromExcel = async (
     const topicData = topicSnap.data();
     const currentTotalFlashcards = topicData?.total_flashcards || 0;
 
+    // Get the highest order number for existing flashcards in this topic
+    const flashcardsQuery = query(
+      collection(db, "flashcards"),
+      where("topic_id", "==", topicId),
+      where("isDeleted", "==", false),
+      orderBy("order", "desc"),
+      limit(1)
+    );
+    
+    const flashcardsSnap = await getDocs(flashcardsQuery);
+    let nextOrder = 1;
+    
+    if (!flashcardsSnap.empty) {
+      const highestOrderFlashcard = flashcardsSnap.docs[0].data();
+      nextOrder = (highestOrderFlashcard.order || 0) + 1;
+    }
+
     for (const row of dataRows) {
       const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
         normalize(row[index])
@@ -313,7 +330,7 @@ export const uploadFlashcardsFromExcel = async (
           question_title: questionTitle,
           answer_title: answerTitle,
           answer,
-          order: 1,
+          order: nextOrder,
           is_active: true,
           isDeleted: false,
           created_at: nowIso,
@@ -321,6 +338,8 @@ export const uploadFlashcardsFromExcel = async (
           document_id: docRef.id,
         });
 
+        // Increment order for next flashcard
+        nextOrder += 1;
         successCount += 1;
       } catch (error) {
         console.error("Failed to import flashcard row:", error);
