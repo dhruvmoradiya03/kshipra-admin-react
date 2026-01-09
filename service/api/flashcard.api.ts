@@ -25,7 +25,6 @@ export interface Flashcard {
   created_at: string;
   document_id: string;
   is_active: boolean;
-  isDeleted: boolean;
   note_id: string;
   order: number;
   question: string;
@@ -75,7 +74,7 @@ export const addFlashcard = async (
       const flashcardsQuery = query(
         collection(db, "flashcards"),
         where("topic_id", "==", flashcardData.topic_id),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("order", "desc"),
         limit(1)
       );
@@ -101,7 +100,6 @@ export const addFlashcard = async (
         answer: flashcardData.answer,
         order: nextOrder,
         is_active: true,
-        isDeleted: false,
         created_at: nowIso,
         updated_at: nowIso,
         document_id: newFlashcardRef.id,
@@ -222,7 +220,7 @@ export const uploadFlashcardsFromExcel = async (
       collection(db, "notes"),
       where("subject_id", "==", subjectId),
       where("topic_id", "==", topicId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     )
   );
 
@@ -265,7 +263,7 @@ export const uploadFlashcardsFromExcel = async (
     const flashcardsQuery = query(
       collection(db, "flashcards"),
       where("topic_id", "==", topicId),
-      where("isDeleted", "==", false),
+      where("is_active", "==", true),
       orderBy("order", "desc"),
       limit(1)
     );
@@ -332,7 +330,6 @@ export const uploadFlashcardsFromExcel = async (
           answer,
           order: nextOrder,
           is_active: true,
-          isDeleted: false,
           created_at: nowIso,
           updated_at: nowIso,
           document_id: docRef.id,
@@ -428,7 +425,7 @@ export const deleteFlashcard = async (flashcardId: string) => {
 
       // Soft delete flashcard
       tx.update(flashcardRef, {
-        isDeleted: true,
+        is_active: false,
         updated_at: nowIso,
       });
 
@@ -483,7 +480,7 @@ export const getFlashcardsBySubjectId = async (
       const countQuery = query(
         flashcardsRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         where("question", ">=", searchQuery),
         where("question", "<=", searchQuery + "\uf8ff")
       );
@@ -495,7 +492,7 @@ export const getFlashcardsBySubjectId = async (
         q = query(
           flashcardsRef,
           where("subject_id", "==", subjectId),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
           orderBy("created_at", "desc"),
@@ -505,7 +502,7 @@ export const getFlashcardsBySubjectId = async (
         q = query(
           flashcardsRef,
           where("subject_id", "==", subjectId),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
           orderBy("created_at", "desc"),
@@ -534,7 +531,7 @@ export const getFlashcardsBySubjectId = async (
     const countQuery = query(
       flashcardsRef,
       where("subject_id", "==", subjectId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     );
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
@@ -544,7 +541,7 @@ export const getFlashcardsBySubjectId = async (
       q = query(
         flashcardsRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         limit(pageSize)
       );
@@ -552,7 +549,7 @@ export const getFlashcardsBySubjectId = async (
       q = query(
         flashcardsRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
@@ -591,7 +588,7 @@ export const getFlashcardCountByNoteId = async (
     const q = query(
       collection(db, "flashcards"),
       where("note_id", "==", noteId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     );
 
     const snapshot = await getCountFromServer(q);
@@ -616,7 +613,7 @@ export const getFlashcardsByTopicId = async (
       const countQuery = query(
         flashcardsRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         where("question", ">=", searchQuery),
         where("question", "<=", searchQuery + "\uf8ff")
       );
@@ -628,7 +625,7 @@ export const getFlashcardsByTopicId = async (
         q = query(
           flashcardsRef,
           where("topic_id", "==", topicId),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
           orderBy("created_at", "desc"),
@@ -638,7 +635,7 @@ export const getFlashcardsByTopicId = async (
         q = query(
           flashcardsRef,
           where("topic_id", "==", topicId),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           where("question", ">=", searchQuery),
           where("question", "<=", searchQuery + "\uf8ff"),
           orderBy("created_at", "desc"),
@@ -668,7 +665,7 @@ export const getFlashcardsByTopicId = async (
     const countQuery = query(
       flashcardsRef,
       where("topic_id", "==", topicId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     );
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
@@ -678,7 +675,7 @@ export const getFlashcardsByTopicId = async (
       q = query(
         flashcardsRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         limit(pageSize)
       );
@@ -686,7 +683,7 @@ export const getFlashcardsByTopicId = async (
       q = query(
         flashcardsRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)

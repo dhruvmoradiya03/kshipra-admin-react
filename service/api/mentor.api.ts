@@ -19,6 +19,8 @@ import { Session } from "inspector/promises";
 export interface SessionCard {
   duration: string;
   fees: number;
+  requiredSlots: number;
+  currency: string;
 }
 
 export interface Schedule {
@@ -31,13 +33,13 @@ export interface Mentor {
   name: string;
   image: string;
   emailId: string;
-  description: string;
-  rank: string;
+  shortBio: string;
+  rank: string[];
   speciality: string;
-  expertise: string;
+  expertise: string[];
   sessionCard: SessionCard[];
   schedule: Schedule[];
-  isDeleted: boolean;
+  isActive: boolean;
   createdAt: any;
   updatedAt: any;
 }
@@ -51,7 +53,7 @@ export const addMentor = async (mentorData: any) => {
     const q = query(
       mentorsRef,
       where("emailId", "==", mentorData.emailId),
-      where("isDeleted", "==", false)
+      where("isActive", "==", true)
     );
     const existingMentors = await getDocs(q);
 
@@ -64,13 +66,13 @@ export const addMentor = async (mentorData: any) => {
       name: mentorData.name,
       image: mentorData.image,
       emailId: mentorData.emailId,
-      description: mentorData.description,
+      shortBio: mentorData.shortBio,
       rank: mentorData.rank,
       speciality: mentorData.speciality,
       expertise: mentorData.expertise,
       sessionCard: mentorData.sessionCard,
       schedule: mentorData.schedule || [],
-      isDeleted: false,
+      isActive: true,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -85,7 +87,7 @@ export const addMentor = async (mentorData: any) => {
       name: mentorData.name,
       image: mentorData.image,
       emailId: mentorData.emailId,
-      description: mentorData.description,
+      shortBio: mentorData.shortBio,
       rank: mentorData.rank,
       speciality: mentorData.speciality,
       expertise: mentorData.expertise,
@@ -109,7 +111,7 @@ export const getMentors = async (searchQuery: string = "") => {
     if (searchQuery && searchQuery.trim() !== "") {
       q = query(
         mentorsRef,
-        where("isDeleted", "==", false),
+        where("isActive", "==", true),
         where("name", ">=", searchQuery),
         where("name", "<=", searchQuery + "\uf8ff"),
         orderBy("name") // Firestore requires the field in range filter to be the first orderBy
@@ -117,7 +119,7 @@ export const getMentors = async (searchQuery: string = "") => {
     } else {
       q = query(
         mentorsRef,
-        where("isDeleted", "==", false),
+        where("isActive", "==", true),
         orderBy("createdAt", "desc")
       );
     }
@@ -146,7 +148,7 @@ export const updateMentor = async (mentorId: string, updateData: any) => {
       name: updateData.name,
       image: updateData.image,
       emailId: updateData.emailId,
-      description: updateData.description,
+      shortBio: updateData.shortBio,
       rank: updateData.rank,
       speciality: updateData.speciality,
       expertise: updateData.expertise,
@@ -166,7 +168,7 @@ export const deleteMentor = async (mentorId: string) => {
   try {
     const noteRef = doc(db, "mentors", mentorId);
     await updateDoc(noteRef, {
-      isDeleted: true,
+      isActive: false,
       updatedAt: serverTimestamp(),
     });
     return { success: true };

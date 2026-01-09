@@ -255,7 +255,6 @@ const ManageFlashcards = () => {
         answer: values.answer,
         order: 1,
         is_active: true,
-        isDeleted: false,
       });
 
       console.log(response, "this is response");

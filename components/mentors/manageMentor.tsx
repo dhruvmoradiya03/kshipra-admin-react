@@ -88,10 +88,10 @@ const manageMentor = () => {
         name: values.name,
         image: imageUrl,
         emailId: values.emailId,
-        description: values.description,
-        rank: values.rank,
+        shortBio: values.shortBio,
+        rank: Array.isArray(values.rank) ? values.rank : [values.rank].filter(Boolean),
         speciality: values.speciality,
-        expertise: values.expertise,
+        expertise: Array.isArray(values.expertise) ? values.expertise : [values.expertise].filter(Boolean),
         sessionCard: values.sessionCards || [],
         schedule: values.schedule || [],
       };
@@ -128,10 +128,10 @@ const manageMentor = () => {
     // Dummy data for testing - in real app, pass the mentor object or fetch ID
     const dummyMentor = {
       name: "Dr. Ananya Sharma",
-      rank: "Senior Mentor",
-      description: "Experienced mentor with 10+ years in counseling.",
+      rank: ["Senior Mentor", "Lead Counselor"],
+      shortBio: "Experienced mentor with 10+ years in counseling.",
       speciality: "Career Guidance",
-      expertise: "Psychology",
+      expertise: ["Psychology", "Career Development", "Student Counseling"],
       emailId: "ananya@example.com",
       image: "/images/dummy-mentor.png",
       sessionCards: [{ duration: 30, fees: "500" }],
@@ -213,7 +213,7 @@ const manageMentor = () => {
               </div>
 
               <div className="relative h-[50px] flex gap-4">
-                <div className="flex items-center gap-2 shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
+                <div className="shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
                   <Image
                     src="/images/plus.svg"
                     width={20}

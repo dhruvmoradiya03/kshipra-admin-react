@@ -8,6 +8,8 @@ const { Text } = Typography;
 interface MentorCardProps {
   name: string;
   imageUrl: string;
+  rank?: string[];
+  expertise?: string[];
   onMenuClick?: () => void; // Deprecated but kept for compatibility if needed, though we are moving to onEdit/onDelete
   onEdit?: () => void;
   onDelete?: () => void;
@@ -17,6 +19,8 @@ interface MentorCardProps {
 const MentorCard: React.FC<MentorCardProps> = ({
   name,
   imageUrl,
+  rank,
+  expertise,
   onMenuClick,
   onEdit,
   onDelete,

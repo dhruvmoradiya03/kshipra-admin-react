@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import Image from "next/image";
-import { Input, Button, Form, Row, Col } from "antd";
+import { Input, Button, Form, Row, Col, Tag } from "antd";
 import { Work_Sans } from "next/font/google"; // Leave this as is
 import { DeleteOutlined } from "@ant-design/icons";
 import styles from "./AddMentor.module.css";
@@ -12,6 +12,8 @@ const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
 interface SessionCardData {
   duration: number;
   fees: string;
+  requiredSlots: number;
+  currency: string;
 }
 
 interface AddMentorProps {
@@ -30,6 +32,10 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [sessionCards, setSessionCards] = useState<SessionCardData[]>([]);
   const [scheduleData, setScheduleData] = useState<any[]>([]);
+  const [rankOptions, setRankOptions] = useState<string[]>([]);
+  const [expertiseOptions, setExpertiseOptions] = useState<string[]>([]);
+  const [rankInputValue, setRankInputValue] = useState('');
+  const [expertiseInputValue, setExpertiseInputValue] = useState('');
 
   useEffect(() => {
     if (initialValues) {
@@ -37,12 +43,18 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
       if (initialValues.image) setPreview(initialValues.image);
       if (initialValues.sessionCards) setSessionCards(initialValues.sessionCards);
       if (initialValues.schedule) setScheduleData(initialValues.schedule);
+      if (initialValues.rank) setRankOptions(Array.isArray(initialValues.rank) ? initialValues.rank : [initialValues.rank]);
+      if (initialValues.expertise) setExpertiseOptions(Array.isArray(initialValues.expertise) ? initialValues.expertise : [initialValues.expertise]);
     } else {
       form.resetFields();
       setPreview(null);
       setImageFile(null);
       setSessionCards([]);
       setScheduleData([]);
+      setRankOptions([]);
+      setExpertiseOptions([]);
+      setRankInputValue('');
+      setExpertiseInputValue('');
     }
   }, [initialValues, form]);
 
@@ -73,12 +85,34 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
           image: initialValues?.image,
           imageFile,
           sessionCards,
-          schedule: scheduleData
+          schedule: scheduleData,
+          rank: rankOptions,
+          expertise: expertiseOptions
         });
       })
       .catch((errorInfo) => {
         console.error("Validation failed:", errorInfo);
       });
+  };
+
+  const handleRankAdd = (value: string) => {
+    if (value && !rankOptions.includes(value)) {
+      setRankOptions([...rankOptions, value]);
+    }
+  };
+
+  const handleRankRemove = (value: string) => {
+    setRankOptions(rankOptions.filter(item => item !== value));
+  };
+
+  const handleExpertiseAdd = (value: string) => {
+    if (value && !expertiseOptions.includes(value)) {
+      setExpertiseOptions([...expertiseOptions, value]);
+    }
+  };
+
+  const handleExpertiseRemove = (value: string) => {
+    setExpertiseOptions(expertiseOptions.filter(item => item !== value));
   };
 
   const handleAddSessionCard = (data: SessionCardData) => {
@@ -104,6 +138,11 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
       return `${hours} ${hours > 1 ? "Hours" : "Hour"}`;
     }
     return `${minutes} Mins`;
+  };
+
+  const formatSessionCard = (card: SessionCardData) => {
+    const slotsText = card.requiredSlots === 1 ? '1 slot' : `${card.requiredSlots} slots`;
+    return `${formatDuration(card.duration)} : ₹${card.fees} (${slotsText})`;
   };
 
   return (
@@ -187,7 +226,6 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
               </Col>
               <Col span={12}>
                 <Form.Item
-                  name="rank"
                   label={
                     <span className="text-[#1E4640] font-bold text-base">
                       Rank
@@ -195,10 +233,39 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
                   }
                   rules={[{ required: true, message: "Enter position or level" }]}
                 >
-                  <Input
-                    placeholder="Enter position or level"
-                    className={`p-3 rounded-xl border border-gray-200 ${styles.customInput}`}
-                  />
+                  <div className={`p-2 rounded-xl border border-gray-200 ${styles.customInput} min-h-[48px] flex flex-wrap items-center gap-2 cursor-text`}>
+                    {rankOptions.map((rank, index) => (
+                      <Tag
+                        key={index}
+                        closable
+                        onClose={() => setRankOptions(rankOptions.filter(item => item !== rank))}
+                        className="bg-gray-200 text-gray-700 border border-gray-300 px-3 py-1 text-sm font-medium"
+                      >
+                        {rank}
+                      </Tag>
+                    ))}
+                    <Input
+                      placeholder="Enter position or level (press Enter to add)"
+                      className="border-none shadow-none p-0 flex-1 min-w-[100px]"
+                      value={rankInputValue}
+                      onChange={(e) => setRankInputValue(e.target.value)}
+                      onPressEnter={(e) => {
+                        const value = rankInputValue.trim();
+                        if (value && !rankOptions.includes(value)) {
+                          setRankOptions([...rankOptions, value]);
+                          setRankInputValue(''); // Clear input state
+                        }
+                        e.preventDefault(); // Prevent default behavior
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !rankInputValue && rankOptions.length > 0) {
+                          // Remove last tag when input is empty and backspace is pressed
+                          setRankOptions(rankOptions.slice(0, -1));
+                        }
+                      }}
+                      bordered={false}
+                    />
+                  </div>
                 </Form.Item>
               </Col>
             </Row>
@@ -207,7 +274,7 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
             <Row gutter={[16, 16]}>
               <Col span={24}>
                 <Form.Item
-                  name="description"
+                  name="shortBio"
                   label={
                     <span className="text-[#1E4640] font-bold text-base">
                       Short Bio
@@ -243,7 +310,6 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
               </Col>
               <Col span={12}>
                 <Form.Item
-                  name="expertise"
                   label={
                     <span className="text-[#1E4640] font-bold text-base">
                       Expertise
@@ -251,10 +317,39 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
                   }
                   rules={[{ required: true, message: "Enter Expertise" }]}
                 >
-                  <Input
-                    placeholder="Enter Expertise"
-                    className={`p-3 rounded-xl border border-gray-200 ${styles.customInput}`}
-                  />
+                  <div className={`p-2 rounded-xl border border-gray-200 ${styles.customInput} min-h-[48px] flex flex-wrap items-center gap-2 cursor-text`}>
+                    {expertiseOptions.map((expertise, index) => (
+                      <Tag
+                        key={index}
+                        closable
+                        onClose={() => setExpertiseOptions(expertiseOptions.filter(item => item !== expertise))}
+                        className="bg-gray-200 text-gray-700 border border-gray-300 px-3 py-1 text-sm font-medium"
+                      >
+                        {expertise}
+                      </Tag>
+                    ))}
+                    <Input
+                      placeholder="Enter Expertise (press Enter to add)"
+                      className="border-none shadow-none p-0 flex-1 min-w-[100px]"
+                      value={expertiseInputValue}
+                      onChange={(e) => setExpertiseInputValue(e.target.value)}
+                      onPressEnter={(e) => {
+                        const value = expertiseInputValue.trim();
+                        if (value && !expertiseOptions.includes(value)) {
+                          setExpertiseOptions([...expertiseOptions, value]);
+                          setExpertiseInputValue(''); // Clear input state
+                        }
+                        e.preventDefault(); // Prevent default behavior
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Backspace' && !expertiseInputValue && expertiseOptions.length > 0) {
+                          // Remove last tag when input is empty and backspace is pressed
+                          setExpertiseOptions(expertiseOptions.slice(0, -1));
+                        }
+                      }}
+                      bordered={false}
+                    />
+                  </div>
                 </Form.Item>
               </Col>
             </Row>
@@ -307,7 +402,7 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
                         className="w-full p-3 border border-gray-200 rounded-xl flex items-center justify-between"
                       >
                         <span className="text-[#1E4640] font-medium text-base">
-                          {formatDuration(card.duration)} : ₹{card.fees}
+                          {formatSessionCard(card)}
                         </span>
                         <div
                           className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center cursor-pointer hover:bg-red-50"

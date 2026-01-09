@@ -19,11 +19,29 @@ const AddSessionCardModal: React.FC<AddSessionCardModalProps> = ({
 }) => {
     const [form] = Form.useForm();
 
+    const getRequiredSlots = (duration: number): number => {
+        switch (duration) {
+            case 15:
+            case 30:
+                return 1;
+            case 45:
+            case 60:
+                return 2;
+            default:
+                return 1;
+        }
+    };
+
     const handleSave = () => {
         form
             .validateFields()
             .then((values) => {
-                onSave(values);
+                const sessionData = {
+                    ...values,
+                    requiredSlots: getRequiredSlots(values.duration),
+                    currency: 'INR'
+                };
+                onSave(sessionData);
                 form.resetFields();
             })
             .catch((info) => {
@@ -74,10 +92,10 @@ const AddSessionCardModal: React.FC<AddSessionCardModalProps> = ({
                                     className={`h-[45px] ${styles.customSelect}`}
                                     popupClassName={worksans.className}
                                     options={[
+                                        { value: 15, label: "15 Mins" },
                                         { value: 30, label: "30 Mins" },
-                                        { value: 60, label: "1 Hours" },
-                                        { value: 90, label: "1.5 Hours" },
-                                        { value: 120, label: "2 Hours" },
+                                        { value: 45, label: "45 Mins" },
+                                        { value: 60, label: "1 Hour" },
                                     ]}
                                     // Ant Design Select styling override often needs global or deep selectors, 
                                     // but we can try to wrap it or use the class.

@@ -37,7 +37,6 @@ export interface Note {
   created_at: string;
   document_id: string;
   is_active: boolean;
-  isDeleted: boolean;
   order: number;
   pdf_url: string;
   subject_id: string;
@@ -60,7 +59,6 @@ export const addNote = async (noteData: any) => {
       pdf_url: noteData.pdf_url ?? null, // Firebase accepts null, but not undefined
       order: noteData.order || 1,
       is_active: true,
-      isDeleted: false,
       total_flashcards: 0,
       created_at: nowIso,
       updated_at: nowIso,
@@ -159,9 +157,8 @@ export const deleteNote = async (noteId: string) => {
       }
     }
     
-    // Soft delete the note using isDeleted field
     await updateDoc(noteRef, {
-      isDeleted: true,
+      is_active: false,
       updated_at: new Date().toISOString(),
     });
     
@@ -182,7 +179,7 @@ export const getNotes = async (
     const notesRef = collection(db, "notes");
     let q = query(
       notesRef,
-      where("isDeleted", "==", false),
+      where("is_active", "==", true),
       orderBy("created_at", "desc"),
       limit(pageSize)
     );
@@ -190,7 +187,7 @@ export const getNotes = async (
     if (lastVisible) {
       q = query(
         notesRef,
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         startAfter(lastVisible),
         limit(pageSize)
@@ -253,7 +250,7 @@ export const getNotesBySubjectId = async (
       const countQuery = query(
         notesRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         where("title", ">=", searchQuery),
         where("title", "<=", searchQuery + "\uf8ff")
       );
@@ -269,7 +266,7 @@ export const getNotesBySubjectId = async (
           where("subject_id", "==", subjectId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           orderBy("created_at", "desc"),
           limit(pageSize)
         );
@@ -281,7 +278,7 @@ export const getNotesBySubjectId = async (
           where("subject_id", "==", subjectId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
@@ -311,7 +308,7 @@ export const getNotesBySubjectId = async (
     const countQuery = query(
       notesRef,
       where("subject_id", "==", subjectId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     );
     const totalSnap = await getCountFromServer(countQuery);
     const total = totalSnap.data().count;
@@ -321,7 +318,7 @@ export const getNotesBySubjectId = async (
       q = query(
         notesRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         limit(pageSize)
       );
@@ -329,7 +326,7 @@ export const getNotesBySubjectId = async (
       q = query(
         notesRef,
         where("subject_id", "==", subjectId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
@@ -375,7 +372,7 @@ export const getNotesByTopicId = async (
       const countQuery = query(
         notesRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         where("title", ">=", searchQuery),
         where("title", "<=", searchQuery + "\uf8ff")
       );
@@ -390,7 +387,7 @@ export const getNotesByTopicId = async (
           where("topic_id", "==", topicId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           orderBy("created_at", "desc"),
           limit(pageSize)
         );
@@ -400,7 +397,7 @@ export const getNotesByTopicId = async (
           where("topic_id", "==", topicId),
           where("title", ">=", searchQuery),
           where("title", "<=", searchQuery + "\uf8ff"),
-          where("isDeleted", "==", false),
+          where("is_active", "==", true),
           orderBy("created_at", "desc"),
           startAfter(lastVisibleDocs[page - 1]),
           limit(pageSize)
@@ -429,7 +426,7 @@ export const getNotesByTopicId = async (
     const countQuery = query(
       notesRef,
       where("topic_id", "==", topicId),
-      where("isDeleted", "==", false)
+      where("is_active", "==", true)
     );
 
     const totalSnap = await getCountFromServer(countQuery);
@@ -440,7 +437,7 @@ export const getNotesByTopicId = async (
       q = query(
         notesRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         limit(pageSize)
       );
@@ -448,7 +445,7 @@ export const getNotesByTopicId = async (
       q = query(
         notesRef,
         where("topic_id", "==", topicId),
-        where("isDeleted", "==", false),
+        where("is_active", "==", true),
         orderBy("created_at", "desc"),
         startAfter(lastVisibleDocs[page - 1]),
         limit(pageSize)
