@@ -46,7 +46,6 @@ export interface Mentor {
 
 export const addMentor = async (mentorData: any) => {
   try {
-    const timestamp = serverTimestamp();
 
     // Check for unique email
     const mentorsRef = collection(db, "mentors");
@@ -73,8 +72,8 @@ export const addMentor = async (mentorData: any) => {
       sessionCard: mentorData.sessionCard,
       schedule: mentorData.schedule || [],
       isActive: true,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     // Step 2: Immediately update the new document with document_id
@@ -94,8 +93,8 @@ export const addMentor = async (mentorData: any) => {
       sessionCard: mentorData.sessionCard,
       schedule: mentorData.schedule,
       document_id: docRef.id,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: new Date().toISOString,
+      updatedAt: new Date().toISOString,
     };
   } catch (error) {
     console.error("Error adding mentor:", error);
@@ -154,7 +153,7 @@ export const updateMentor = async (mentorId: string, updateData: any) => {
       expertise: updateData.expertise,
       sessionCard: updateData.sessionCard,
       schedule: updateData.schedule,
-      createdAt: serverTimestamp(),
+      updatedAt: new Date().toISOString(),
     });
     return { id: mentorId, ...updateData };
   } catch (error) {
