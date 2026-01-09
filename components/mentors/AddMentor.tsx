@@ -147,7 +147,7 @@ const AddMentor: React.FC<AddMentorProps> = ({ onCancel, onSave, initialValues, 
 
   return (
     <div
-      className={`w-full h-[640px] flex flex-col bg-white rounded-3xl p-6 ${worksans.className}`}
+      className={`w-full h-[calc(100vh-115px)] flex flex-col bg-white rounded-3xl p-6 ${worksans.className}`}
     >
       {/* Header with Set Schedule */}
       <div className="flex justify-end mb-1.5">
