@@ -81,7 +81,7 @@ const manageMentor = () => {
         imageUrl = await handleImageUpload(values.imageFile);
         console.log("Uploaded new image:", imageUrl);
       }
-
+//
       console.log("Final imageUrl to save:", imageUrl);
 
       const mentorData = {
