@@ -32,10 +32,11 @@ interface Flashcard {
   subject_id: string;
   topic_id: string;
   note_id: string;
-  question_title: string;
+  question_title?: string;
   question: string;
-  answer_title: string;
+  answer_title?: string;
   answer: string;
+  tag?: string;
 }
 
 interface EditFlashCardModalProps {
@@ -135,6 +136,7 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         question: flashcard.question,
         answerTitle: flashcard.answer_title,
         answer: flashcard.answer,
+        tag: flashcard.tag,
       });
     } else {
       // Reset form and states when modal is closed
@@ -177,10 +179,11 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         subject_id: values.subject,
         topic_id: values.topic,
         note_id: values.note,
-        question_title: values.questionTitle,
+        question_title: values.questionTitle || "",
         question: values.question,
-        answer_title: values.answerTitle,
+        answer_title: values.answerTitle || "",
         answer: values.answer,
+        tag: values.tag || "",
       };
       
       await onSave(transformedValues);
@@ -275,7 +278,6 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         <Form.Item
           name="questionTitle"
           label="Question Title"
-          rules={[{ required: true, message: "Please enter a question title" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <Input
@@ -309,7 +311,6 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         <Form.Item
           name="answerTitle"
           label="Answer Title"
-          rules={[{ required: true, message: "Please enter an answer title" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <Input
@@ -331,6 +332,22 @@ const EditFlashCardModal: React.FC<EditFlashCardModalProps> = ({
         >
           <Input
             placeholder="Add Answer"
+            style={{
+              height: 45,
+              borderRadius: 8,
+              fontFamily: "Work Sans",
+              fontWeight: 400,
+            }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="tag"
+          label="Tag"
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <Input
+            placeholder="Add Tag (optional)"
             style={{
               height: 45,
               borderRadius: 8,

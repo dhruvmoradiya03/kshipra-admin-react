@@ -17,21 +17,23 @@ import {
 import { db } from "../config/firebase.config";
 import { getStorage, ref, uploadBytes } from "firebase/storage";
 import * as XLSX from "xlsx";
+import { addNote } from "./notes.api";
 
 export interface Flashcard {
   id?: string;
   answer: string;
-  answer_title: string;
+  answer_title?: string;
   created_at: string;
   document_id: string;
   is_active: boolean;
   note_id: string;
   order: number;
   question: string;
-  question_title: string;
+  question_title?: string;
   subject_id: string;
   topic_id: string;
   updated_at: string;
+  tag?: string;
 }
 
 // Add a new flashcard
@@ -98,6 +100,7 @@ export const addFlashcard = async (
         question: flashcardData.question,
         answer_title: flashcardData.answer_title,
         answer: flashcardData.answer,
+        tag: flashcardData.tag || "",
         order: nextOrder,
         is_active: true,
         created_at: nowIso,
@@ -135,7 +138,7 @@ export const addFlashcard = async (
 const normalize = (value: unknown): string => String(value ?? "").trim();
 const normalizeKey = (value: unknown): string => normalize(value).toLowerCase();
 
-const REQUIRED_HEADERS = ["note title", "question title", "question", "answer title", "answer"];
+const REQUIRED_HEADERS = ["note title", "question", "answer"];
 
 interface BulkUploadResult {
   totalCount: number;
@@ -194,15 +197,25 @@ export const uploadFlashcardsFromExcel = async (
     (rows[0] as (string | undefined)[] | undefined)?.map(
       (cell: string | undefined) => normalize(cell).toLowerCase()
     ) ?? [];
-  const headerValid = REQUIRED_HEADERS.every(
-    (header, index) => headerRow[index] === header
-  );
-
-  if (!headerValid) {
+  
+  // Check if required headers are present (note title, question, answer)
+  const hasNoteTitle = headerRow.includes("note title");
+  const hasQuestion = headerRow.includes("question");
+  const hasAnswer = headerRow.includes("answer");
+  
+  if (!hasNoteTitle || !hasQuestion || !hasAnswer) {
     throw new Error(
-      "Invalid Excel template. Ensure the first row contains the columns: Note title, Question, Answer, Category."
+      "Invalid Excel template. Ensure the first row contains the columns: Note title, Question, Answer. Question title, Answer title, and Tag are optional."
     );
   }
+  
+  // Find column indices
+  const noteTitleIndex = headerRow.indexOf("note title");
+  const questionTitleIndex = headerRow.indexOf("question title");
+  const questionIndex = headerRow.indexOf("question");
+  const answerTitleIndex = headerRow.indexOf("answer title");
+  const answerIndex = headerRow.indexOf("answer");
+  const tagIndex = headerRow.indexOf("tag");
 
   const dataRows = rows
     .slice(1)
@@ -277,22 +290,24 @@ export const uploadFlashcardsFromExcel = async (
     }
 
     for (const row of dataRows) {
-      const normalizedCells = REQUIRED_HEADERS.map((_, index) =>
-        normalize(row[index])
-      );
-      const [noteTitle, questionTitle, question, answerTitle, answer] = normalizedCells;
+      const noteTitle = normalize(row[noteTitleIndex]);
+      const questionTitle = questionTitleIndex >= 0 ? normalize(row[questionTitleIndex]) : "";
+      const question = normalize(row[questionIndex]);
+      const answerTitle = answerTitleIndex >= 0 ? normalize(row[answerTitleIndex]) : "";
+      const answer = normalize(row[answerIndex]);
+      const tag = tagIndex >= 0 ? normalize(row[tagIndex]) : "";
 
       console.log("Processing row:", {
         originalRow: row,
-        normalizedCells,
         noteTitle,
         questionTitle,
         question,
         answerTitle,
         answer,
+        tag,
       });
 
-      if (!noteTitle || !question || !answer || !questionTitle || !answerTitle) {
+      if (!noteTitle || !question || !answer) {
         console.log("Skipping row - missing required fields:", {
           noteTitle: !!noteTitle,
           questionTitle: !!questionTitle,
@@ -310,10 +325,25 @@ export const uploadFlashcardsFromExcel = async (
         found: note,
         availableKeys: Array.from(noteMap.keys())
       });
+      
+      let noteId: string;
       if (!note) {
-        console.log("Skipping row - note not found:", noteTitle);
-        console.log("Available notes:", Array.from(noteMap.keys()));
-        continue;
+        console.log("Creating new note:", noteTitle);
+        try {
+          const newNote = await addNote({
+            subject_id: subjectId,
+            topic_id: topicId,
+            title: noteTitle,
+            pdf_url: "",
+          });
+          noteId = newNote.document_id;
+          console.log(`Note "${noteTitle}" created successfully`);
+        } catch (err) {
+          console.error("Error creating note:", err);
+          continue;
+        }
+      } else {
+        noteId = note.id;
       }
 
       try {
@@ -323,11 +353,12 @@ export const uploadFlashcardsFromExcel = async (
         tx.set(docRef, {
           subject_id: subjectId,
           topic_id: topicId,
-          note_id: note.id,
+          note_id: noteId,
           question,
           question_title: questionTitle,
           answer_title: answerTitle,
           answer,
+          tag,
           order: nextOrder,
           is_active: true,
           created_at: nowIso,

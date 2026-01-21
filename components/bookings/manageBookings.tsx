@@ -2,135 +2,45 @@
 
 import Image from "next/image";
 import { Work_Sans } from "next/font/google";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BookingsList, { Booking } from "./BookingsList"; // Import new list
 import "./bookings.css"; // Assuming we might want to keep or rename flashcard.css references if needed, but for now I'll trust bookings.css exists or use inline styles. 
 // Note: The previous file imported "./flashcard.css", but the directory listing showed "bookings.css". 
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"], subsets: ["latin"] });
 
-const dummyBookings: Booking[] = [
-  {
-    id: "1",
-    studentName: "John Doe",
-    mentorName: "Alice Smith",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹500",
-    bookingStatus: "Accepted",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "2",
-    studentName: "Jane Roe",
-    mentorName: "Bob Johnson",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹500",
-    bookingStatus: "Accepted",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "3",
-    studentName: "Michael Scott",
-    mentorName: "Dwight Schrute",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹1000",
-    bookingStatus: "Accepted",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "4",
-    studentName: "Jim Halpert",
-    mentorName: "Pam Beesly",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹750",
-    bookingStatus: "Accepted",
-    paymentStatus: "Refund",
-  },
-  {
-    id: "5",
-    studentName: "Ryan Howard",
-    mentorName: "Kelly Kapoor",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹600",
-    bookingStatus: "Rejected",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "6",
-    studentName: "Stanley Hudson",
-    mentorName: "Phyllis Vance",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹550",
-    bookingStatus: "Rejected",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "7",
-    studentName: "Angela Martin",
-    mentorName: "Oscar Martinez",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹800",
-    bookingStatus: "Accepted",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "8",
-    studentName: "Angela Martin",
-    mentorName: "Oscar Martinez",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹800",
-    bookingStatus: "Rejected",
-    paymentStatus: "Paid",
-  },
-  {
-    id: "9",
-    studentName: "Angela Martin",
-    mentorName: "Oscar Martinez",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹800",
-    bookingStatus: "Rejected",
-    paymentStatus: "Refund",
-  },
-  {
-    id: "10",
-    studentName: "Angela Martin",
-    mentorName: "Oscar Martinez",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹800",
-    bookingStatus: "Accepted",
-    paymentStatus: "Pending",
-  },
-  {
-    id: "11",
-    studentName: "Angela Martin",
-    mentorName: "Oscar Martinez",
-    timeSlot: "17.06.25 11:00AM",
-    duration: "1 hour",
-    amount: "₹800",
-    bookingStatus: "Accepted",
-    paymentStatus: "Paid",
-  },
-];
+import { getBookings } from "../../service/api/bookings.api";
 
 const ManageBookings = () => {
+  const [bookingsData, setBookingsData] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Filter dummy data based on search
-  const filteredBookings = dummyBookings.filter(b =>
-    b.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.mentorName.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    let mounted = true;
+    const fetchBookings = async () => {
+      setLoading(true);
+      try {
+        const res: any = await getBookings();
+        if (mounted && res?.data) setBookingsData(res.data);
+      } catch (e) {
+        console.error("Failed to load bookings", e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchBookings();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Filter fetched data based on search
+  const filteredBookings = bookingsData.filter((b) =>
+    b.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    b.mentorName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Pagination logic
@@ -175,7 +85,9 @@ const ManageBookings = () => {
 
         {/* Bookings List Table or No Content */}
         <div className="h-full flex-1 w-full flex bg-white px-4 pt-4 overflow-hidden">
-          {filteredBookings.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center w-full h-full">Loading...</div>
+          ) : filteredBookings.length === 0 ? (
             <div className="flex flex-col items-center justify-center w-full h-full">
               <Image
                 src="/images/no_content.svg"

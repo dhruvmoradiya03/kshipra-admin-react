@@ -12,7 +12,7 @@ export interface Booking {
   timeSlot: string;
   duration: string;
   amount: string;
-  bookingStatus: "Accepted" | "Rejected" ;
+  bookingStatus: "Accepted" | "Rejected" | "Pending";
   paymentStatus: "Paid" | "Pending" | "Refund";
 }
 
@@ -95,6 +95,9 @@ const BookingsList: React.FC<BookingsListProps> = ({
             break;
           case "Rejected":
             color = "#EB0000"; 
+            break;
+          case "Pending":
+            color = "#FFA500"; 
             break;
           default:
             color = "#000000";

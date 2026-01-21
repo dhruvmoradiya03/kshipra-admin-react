@@ -77,6 +77,7 @@ interface Flashcard {
   answer_title?: string;
   answer: string;
   category: string;
+  tag?: string;
   created_at: string;
   updated_at: string;
 }
@@ -116,14 +117,14 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       title: "Note Title",
       dataIndex: ["note_id"],
       key: "noteTitle",
-      width: "24%",
+      width: "16%",
       render: (noteId: string) => {
         if (loadingNotes[noteId]) {
           return <Skeleton.Input active size="small" style={{ width: 150 }} />;
         }
         const title = noteTitles[noteId] || "Untitled Note";
         return (
-          <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+          <Text ellipsis style={{ cursor: "pointer", maxWidth: "180px" }}>
             {title}
           </Text>
         );
@@ -133,10 +134,10 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       title: "Question Title",
       dataIndex: "question_title",
       key: "questionTitle",
-      width: "18%",
+      width: "12%",
       render: (text: string) => (
-        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
-          {text}
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "120px" }}>
+          {text || "-"}
         </Text>
       ),
     },
@@ -144,9 +145,9 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       title: "Question",
       dataIndex: "question",
       key: "question",
-      width: "24%",
+      width: "16%",
       render: (text: string, record: Flashcard) => (
-        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "180px" }}>
           {text}
         </Text>
       ),
@@ -155,10 +156,10 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       title: "Answer Title",
       dataIndex: "answer_title",
       key: "answerTitle",
-      width: "18%",
+      width: "12%",
       render: (text: string) => (
-        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
-          {text}
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "120px" }}>
+          {text || "-"}
         </Text>
       ),
     },
@@ -166,17 +167,29 @@ const FlashCardList: React.FC<FlashCardListProps> = ({
       title: "Answer",
       dataIndex: "answer",
       key: "answer",
-      width: "24%",
+      width: "16%",
       render: (text: string, record: Flashcard) => (
-        <Text ellipsis style={{ cursor: "pointer", maxWidth: "230px" }}>
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "180px" }}>
           {text}
+        </Text>
+      ),
+    },
+    {
+      title: "Tag",
+      dataIndex: "tag",
+      key: "tag",
+      width: "12%",
+      render: (text: string) => (
+        <Text ellipsis style={{ cursor: "pointer", maxWidth: "120px" }}>
+          {text || "-"}
         </Text>
       ),
     },
     {
       title: "Actions",
       key: "actions",
-      width: "14%",
+      width: "8%",
+      fixed: "right" as const,
       render: (_: any, record: Flashcard) => (
         <Space size="middle">
           <Button

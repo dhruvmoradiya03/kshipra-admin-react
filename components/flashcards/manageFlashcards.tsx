@@ -249,10 +249,11 @@ const ManageFlashcards = () => {
         subject_id: values.subject,
         topic_id: values.topic,
         note_id: values.note,
-        question_title: values.questionTitle,
+        question_title: values.questionTitle || "",
         question: values.question,
-        answer_title: values.answerTitle,
+        answer_title: values.answerTitle || "",
         answer: values.answer,
+        tag: values.tag || "",
         order: 1,
         is_active: true,
       });

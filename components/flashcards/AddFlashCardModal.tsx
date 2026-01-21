@@ -363,7 +363,6 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
          <Form.Item
           name="questionTitle"
           label="Question Title"
-          rules={[{ required: true, message: "Add Question Title" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <div className="flex gap-3">
@@ -401,7 +400,6 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
         <Form.Item
           name="answerTitle"
           label="Answer Title"
-          rules={[{ required: true, message: "Add Answer Title" }]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
           <div className="flex gap-3">
@@ -426,6 +424,24 @@ const AddFlashCardModal: React.FC<AddFlashCardModalProps> = ({
           <div className="flex gap-3">
             <Input
               placeholder="Add Answer"
+              style={{
+                height: 45,
+                borderRadius: 8,
+                fontFamily: "Work Sans",
+                fontWeight: 400,
+              }}
+            />
+          </div>
+        </Form.Item>
+
+        <Form.Item
+          name="tag"
+          label="Tag"
+          className={`font-medium text-[#1E4640] ${worksans.className}`}
+        >
+          <div className="flex gap-3">
+            <Input
+              placeholder="Add Tag (optional)"
               style={{
                 height: 45,
                 borderRadius: 8,
