@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, orderBy, limit, startAfter, getCountFromServer } from "firebase/firestore";
 import { db } from "../config/firebase.config";
 
 const formatAmount = (amount: number | undefined, currency = "INR") => {
@@ -115,11 +115,39 @@ const formatSessionDate = (val: any) => {
   return String(val);
 };
 
-export const getBookings = async () => {
+export const getBookings = async (
+  page: number = 1,
+  pageSize: number = 10,
+  lastVisible: any = null
+) => {
   try {
     const ordersRef = collection(db, "userOrders");
-    const snap = await getDocs(ordersRef);
+    
+    // Get total count for pagination
+    const countQuery = query(ordersRef);
+    const totalSnap = await getCountFromServer(countQuery);
+    const total = totalSnap.data().count;
+
+    // Build paginated query
+    let q;
+    if (page === 1 || !lastVisible) {
+      q = query(
+        ordersRef,
+        orderBy("createdAt", "desc"),
+        limit(pageSize)
+      );
+    } else {
+      q = query(
+        ordersRef,
+        orderBy("createdAt", "desc"),
+        startAfter(lastVisible),
+        limit(pageSize)
+      );
+    }
+
+    const snap = await getDocs(q);
     const results: any[] = [];
+    const lastVisibleDoc = snap.docs[snap.docs.length - 1];
 
     for (const docSnap of snap.docs) {
       const data: any = docSnap.data();
@@ -209,7 +237,13 @@ export const getBookings = async () => {
       });
     }
 
-    return { data: results };
+    return {
+      data: results,
+      lastVisible: lastVisibleDoc,
+      total,
+      page,
+      pageSize,
+    };
   } catch (error) {
     console.error("Error fetching bookings:", error);
     throw new Error("Failed to fetch bookings");

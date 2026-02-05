@@ -52,13 +52,15 @@ const MentorCard: React.FC<MentorCardProps> = ({
       styles={{ body: { padding: 0 } }}
       onClick={onClick}
     >
-      <div className="relative w-full h-[190px] rounded-b-2xl overflow-hidden">
+      <div className="relative w-full h-[190px] rounded-b-2xl overflow-hidden bg-gray-100">
         <Image
           src={imageUrl}
           alt={name}
           layout="fill"
-          objectFit="cover"
+          objectFit="contain"
+          objectPosition="top center"
           className="rounded-t-2xl"
+          priority
         />
         <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
           <Button

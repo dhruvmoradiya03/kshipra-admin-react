@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import { Work_Sans } from "next/font/google";
-import { Dropdown, Space, Button, Pagination } from "antd";
-import { DownOutlined, PlusOutlined } from "@ant-design/icons";
+import { Dropdown, Space, Button, Pagination, message } from "antd";
+import { DownOutlined, PlusOutlined, DragOutlined, SaveOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
-
+import { DndProvider, useDrag, useDrop } from "react-dnd/dist/index.js";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { debounce } from "lodash";
-
 import MentorCard from "./MentorCard";
 import AddMentor from "./AddMentor";
 import RemoveMentorModal from "./RemoveMentorModal";
@@ -16,6 +16,7 @@ import {
   getMentors,
   updateMentor,
   deleteMentor,
+  updateMentorOrders,
 } from "@/service/api/mentor.api";
 import { handleImageUpload } from "@/service/api/config.api";
 
@@ -33,6 +34,69 @@ const manageMentor = () => {
   const [isSuccessAlertOpen, setIsSuccessAlertOpen] = useState(false);
   const [isErrorAlertOpen, setIsErrorAlertOpen] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const [reorderedMentors, setReorderedMentors] = useState<any[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Draggable Mentor Card Component
+  const DraggableMentorCard = ({ mentor, index, moveMentor, isReordering }: any) => {
+    const [{ isDragging }, drag] = useDrag({
+      type: 'mentor',
+      item: { index },
+      collect: (monitor: any) => ({
+        isDragging: monitor.isDragging(),
+      }),
+    });
+
+    const [, drop] = useDrop({
+      accept: 'mentor',
+      hover: (item: { index: number }) => {
+        if (!isReordering) return;
+        if (item.index !== index) {
+          moveMentor(item.index, index);
+          item.index = index;
+        }
+      },
+    });
+
+    return (
+      <div
+        ref={(node) => {
+          if (isReordering) {
+            drag(drop(node));
+          }
+        }}
+        style={{ opacity: isDragging ? 0.5 : 1 }}
+      >
+        <MentorCard
+          key={mentor.id || index}
+          name={mentor.name}
+          imageUrl={mentor.image || "/images/dummy-mentor.png"}
+          onMenuClick={() => console.log("Menu clicked")}
+          onEdit={() => {
+            const formValues = {
+              ...mentor,
+              sessionCards: mentor.sessionCard || [],
+            };
+            setSelectedMentor(formValues);
+            setView("add");
+          }}
+          onDelete={() => {
+            setSelectedMentor(mentor);
+            handleDeleteClick();
+          }}
+          onClick={() => {
+            const formValues = {
+              ...mentor,
+              sessionCards: mentor.sessionCard || [],
+            };
+            setSelectedMentor(formValues);
+            setView("add");
+          }}
+        />
+      </div>
+    );
+  };
 
   const fetchMentors = async (query: string = "") => {
     try {
@@ -81,7 +145,6 @@ const manageMentor = () => {
         imageUrl = await handleImageUpload(values.imageFile);
         console.log("Uploaded new image:", imageUrl);
       }
-//
       console.log("Final imageUrl to save:", imageUrl);
 
       const mentorData = {
@@ -143,6 +206,52 @@ const manageMentor = () => {
 
   const handleDeleteClick = () => {
     setIsRemoveModalOpen(true);
+  };
+
+  const handleReorderClick = () => {
+    setIsReordering(true);
+    setReorderedMentors([...mentorList]);
+    setHasChanges(false);
+  };
+
+  const handleSaveOrder = async () => {
+    try {
+      setLoading(true);
+      const mentorOrders = reorderedMentors.map((mentor, index) => ({
+        mentorId: mentor.id,
+        order: index + 1,
+      }));
+      
+      await updateMentorOrders(mentorOrders);
+      setSuccessMessage("Mentor order updated successfully.");
+      setErrorMessage(null);
+      setIsSuccessAlertOpen(true);
+      setIsReordering(false);
+      setHasChanges(false);
+      fetchMentors();
+    } catch (error) {
+      console.error("Error updating mentor order:", error);
+      const message = error instanceof Error ? error.message : "Failed to update mentor order.";
+      setErrorMessage(message);
+      setIsErrorAlertOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelReorder = () => {
+    setIsReordering(false);
+    setReorderedMentors([]);
+    setHasChanges(false);
+  };
+
+  const moveMentor = (dragIndex: number, hoverIndex: number) => {
+    const dragItem = reorderedMentors[dragIndex];
+    const newItems = [...reorderedMentors];
+    newItems.splice(dragIndex, 1);
+    newItems.splice(hoverIndex, 0, dragItem);
+    setReorderedMentors(newItems);
+    setHasChanges(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -230,66 +339,82 @@ const manageMentor = () => {
                     Add Mentor
                   </button>
                 </div>
+                
+                {!isReordering ? (
+                  <div className="shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
+                    <DragOutlined className="text-[#1E4640]" />
+                    <button
+                      className="text-[#1E4640] font-medium"
+                      onClick={handleReorderClick}
+                    >
+                      Reorder
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="shadow-[0px_0px_4px_0px_#10B98140] hover:shadow-[0px_2px_8px_0px_#10B98160] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-green-50 transition-all duration-300 hover:-translate-y-0.2">
+                      <SaveOutlined className="text-green-600" />
+                      <button
+                        className="text-green-600 font-medium"
+                        onClick={handleSaveOrder}
+                        disabled={!hasChanges || loading}
+                      >
+                        Save Order
+                      </button>
+                    </div>
+                    <div className="shadow-[0px_0px_4px_0px_#EF444440] hover:shadow-[0px_2px_8px_0px_#EF444460] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-red-50 transition-all duration-300 hover:-translate-y-0.2">
+                      <button
+                        className="text-red-600 font-medium"
+                        onClick={handleCancelReorder}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
         {view === "list" ? (
-          <div className="h-full flex-1 w-full flex bg-white px-4 pb-4">
-            <div className="w-full max-h-[500px] overflow-y-auto p-2 no-scrollbar">
-              <div className="grid grid-cols-4 gap-4 w-full">
-                {mentorList.length === 0 ? (
-                  <div className="col-span-4 flex flex-col items-center justify-center w-full h-full min-h-[500px]">
-                    <Image
-                      src="/images/no_content.svg"
-                      width={120}
-                      height={120}
-                      alt="No content available"
-                      priority
-                    />
+          <DndProvider backend={HTML5Backend}>
+            <div className="h-full flex-1 w-full flex bg-white px-4 pb-4">
+              <div className="w-full max-h-[500px] overflow-y-auto p-2 no-scrollbar">
+                <div className="grid grid-cols-4 gap-4 w-full">
+                  {mentorList.length === 0 ? (
+                    <div className="col-span-4 flex flex-col items-center justify-center h-full">
+                      <Image
+                        src="/images/no_content.svg"
+                        width={120}
+                        height={120}
+                        alt="No content available"
+                        priority
+                      />
 
-                    <div className="text-[#1E4640] font-bold text-2xl text-center mt-4">
-                      No Mentors Found!
-                    </div>
+                      <div className="text-[#1E4640] font-bold text-2xl text-center mt-4">
+                        No Mentors Found!
+                      </div>
 
-                    <div className="text-[#758382] text-center mt-1 whitespace-nowrap">
-                      Add a mentor to get started.
+                      <div className="text-[#758382] text-center mt-1 whitespace-nowrap">
+                        Add a mentor to get started.
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  mentorList.map((mentor, index) => (
-                    <MentorCard
-                      key={mentor.id || index}
-                      name={mentor.name}
-                      imageUrl={mentor.image || "/images/dummy-mentor.png"}
-                      onMenuClick={() => console.log("Menu clicked")}
-                      onEdit={() => {
-                        const formValues = {
-                          ...mentor,
-                          sessionCards: mentor.sessionCard || [],
-                        };
-                        setSelectedMentor(formValues);
-                        setView("add");
-                      }}
-                      onDelete={() => {
-                        setSelectedMentor(mentor);
-                        handleDeleteClick();
-                      }}
-                      onClick={() => {
-                        const formValues = {
-                          ...mentor,
-                          sessionCards: mentor.sessionCard || [],
-                        };
-                        setSelectedMentor(formValues);
-                        setView("add");
-                      }}
-                    />
-                  ))
-                )}
+                  ) : (
+                    (isReordering ? reorderedMentors : mentorList).map((mentor, index) => (
+                      <DraggableMentorCard
+                        key={mentor.id || index}
+                        mentor={mentor}
+                        index={index}
+                        moveMentor={moveMentor}
+                        isReordering={isReordering}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </DndProvider>
         ) : (
           <AddMentor
             initialValues={selectedMentor}

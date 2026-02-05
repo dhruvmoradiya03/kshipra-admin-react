@@ -10,21 +10,33 @@ import "./bookings.css"; // Assuming we might want to keep or rename flashcard.c
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"], subsets: ["latin"] });
 
 import { getBookings } from "../../service/api/bookings.api";
+import Loader from "../loader";
 
 const ManageBookings = () => {
   const [bookingsData, setBookingsData] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [lastVisibleDoc, setLastVisibleDoc] = useState<any>(null);
+  const [lastVisibleDocs, setLastVisibleDocs] = useState<Record<number, any | null>>({});
 
   useEffect(() => {
     let mounted = true;
     const fetchBookings = async () => {
       setLoading(true);
       try {
-        const res: any = await getBookings();
-        if (mounted && res?.data) setBookingsData(res.data);
+        const lastVisible = currentPage === 1 ? null : lastVisibleDocs[currentPage - 1];
+        const res: any = await getBookings(currentPage, pageSize, lastVisible);
+        if (mounted && res?.data) {
+          setBookingsData(res.data);
+          setTotalBookings(res.total);
+          if (res.lastVisible) {
+            setLastVisibleDoc(res.lastVisible);
+            setLastVisibleDocs(prev => ({ ...prev, [currentPage]: res.lastVisible }));
+          }
+        }
       } catch (e) {
         console.error("Failed to load bookings", e);
       } finally {
@@ -35,16 +47,17 @@ const ManageBookings = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [currentPage, pageSize]);
 
-  // Filter fetched data based on search
-  const filteredBookings = bookingsData.filter((b) =>
-    b.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.mentorName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Pagination logic
-  const currentData = filteredBookings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const handlePageChange = (page: number, newPageSize?: number) => {
+    if (newPageSize && newPageSize !== pageSize) {
+      setPageSize(newPageSize);
+      setCurrentPage(1);
+      setLastVisibleDocs({});
+    } else {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className={`flex flex-col px-6 py-4 bg-[#F5F6F7] h-full ${worksans.className}`}>
@@ -79,15 +92,13 @@ const ManageBookings = () => {
           <div
             className={`text-[#1E4640] ${worksans.className} font-semibold text-2xl`}
           >
-            Total Bookings({filteredBookings.length})
+            Total Bookings({totalBookings})
           </div>
         </div>
 
         {/* Bookings List Table or No Content */}
         <div className="h-full flex-1 w-full flex bg-white px-4 pt-4 overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center w-full h-full">Loading...</div>
-          ) : filteredBookings.length === 0 ? (
+          {bookingsData.length === 0 && !loading ? (
             <div className="flex flex-col items-center justify-center w-full h-full">
               <Image
                 src="/images/no_content.svg"
@@ -105,13 +116,14 @@ const ManageBookings = () => {
             </div>
           ) : (
             <BookingsList
-              bookings={currentData}
+              bookings={bookingsData}
+              loading={loading}
               pagination={{
                 page: currentPage,
                 pageSize: pageSize,
-                total: filteredBookings.length
+                total: totalBookings
               }}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={handlePageChange}
             />
           )}
         </div>

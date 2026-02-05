@@ -252,7 +252,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
           ]}
           className={`font-medium text-[#1E4640] ${worksans.className}`}
         >
-          <div className="flex gap-3">
+          <div className="space-y-3">
             <Input
               placeholder="Or paste PDF link here"
               style={{
@@ -271,7 +271,7 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
               value={currentFileUrl || ""}
             />
 
-            <Upload
+            <Upload.Dragger
               beforeUpload={(file) => {
                 if (file.type !== "application/pdf") {
                   message.error("You can only upload PDF files!");
@@ -297,38 +297,46 @@ const EditNoteModal: React.FC<EditNoteModalProps> = ({
               }}
               maxCount={1}
               accept=".pdf"
+              showUploadList={false}
+              style={{
+                backgroundColor: "#fafafa",
+                border: "2px dashed #d9d9d9",
+                borderRadius: 8,
+                padding: "20px",
+                textAlign: "center",
+                cursor: "pointer",
+                transition: "border-color 0.3s",
+              }}
             >
-              <Button
-                icon={<UploadOutlined />}
-                style={{
-                  height: 45,
-                  borderRadius: 8,
-                  paddingInline: 20,
-                  fontFamily: "Work Sans",
-                }}
-                disabled={isUploading}
-              >
-                {isUploading ? "Uploading..." : "Upload PDF"}
-              </Button>
-            </Upload>
+              <p className="ant-upload-drag-icon">
+                <UploadOutlined style={{ fontSize: 48, color: "#1E4640" }} />
+              </p>
+              <p className="ant-upload-text" style={{ color: "#1E4640", fontWeight: 500 }}>
+                Click or drag PDF file to this area to upload
+              </p>
+              <p className="ant-upload-hint" style={{ color: "#758382" }}>
+                Support for a single PDF file upload. File size should not exceed 10MB.
+              </p>
+            </Upload.Dragger>
+            
+            {fileList.length > 0 ? (
+              <div className="text-sm text-green-600 font-medium">
+                ✓ New file selected: {fileList[0].name}
+              </div>
+            ) : currentFileUrl ? (
+              <div className="text-sm text-gray-600">
+                Current file:{" "}
+                <a
+                  href={currentFileUrl || ""}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  View file
+                </a>
+              </div>
+            ) : null}
           </div>
-          {fileList.length > 0 ? (
-            <div className="mt-2 text-sm text-gray-600">
-              New file selected: {fileList[0].name}
-            </div>
-          ) : currentFileUrl ? (
-            <div className="mt-2 text-sm text-gray-600">
-              Current file:{" "}
-              <a
-                href={currentFileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                View file
-              </a>
-            </div>
-          ) : null}
         </Form.Item>
 
         {/* FOOTER BUTTONS */}

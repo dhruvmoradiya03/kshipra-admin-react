@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "react-dnd": ["./node_modules/react-dnd/dist/index.d.ts"]
     }
   },
   "include": [

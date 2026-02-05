@@ -40,6 +40,7 @@ export interface Mentor {
   sessionCard: SessionCard[];
   schedule: Schedule[];
   isActive: boolean;
+  order: number;
   createdAt: any;
   updatedAt: any;
 }
@@ -60,6 +61,21 @@ export const addMentor = async (mentorData: any) => {
       throw new Error("A mentor with this email ID already exists.");
     }
 
+    // Calculate the next order number
+    const allMentorsQuery = query(
+      mentorsRef,
+      where("isActive", "==", true),
+      orderBy("order", "desc"),
+      limit(1)
+    );
+    const allMentorsSnapshot = await getDocs(allMentorsQuery);
+    
+    let nextOrder = 1;
+    if (!allMentorsSnapshot.empty) {
+      const highestOrderMentor = allMentorsSnapshot.docs[0].data();
+      nextOrder = (highestOrderMentor.order || 0) + 1;
+    }
+
     // Step 1: Create the document
     const docRef = await addDoc(collection(db, "mentors"), {
       name: mentorData.name,
@@ -72,6 +88,7 @@ export const addMentor = async (mentorData: any) => {
       sessionCard: mentorData.sessionCard,
       schedule: mentorData.schedule || [],
       isActive: true,
+      order: mentorData.order || nextOrder, // Use provided order or calculated next order
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -119,7 +136,7 @@ export const getMentors = async (searchQuery: string = "") => {
       q = query(
         mentorsRef,
         where("isActive", "==", true),
-        orderBy("createdAt", "desc")
+        orderBy("order", "asc") // Order by order field instead of createdAt
       );
     }
 
@@ -162,17 +179,85 @@ export const updateMentor = async (mentorId: string, updateData: any) => {
   }
 };
 
-// Soft delete a note
+// Soft delete a note and reorder remaining mentors
 export const deleteMentor = async (mentorId: string) => {
   try {
-    const noteRef = doc(db, "mentors", mentorId);
-    await updateDoc(noteRef, {
+    // Get the mentor being deleted to know its order
+    const mentorRef = doc(db, "mentors", mentorId);
+    const mentorDoc = await getDoc(mentorRef);
+    
+    if (!mentorDoc.exists()) {
+      throw new Error("Mentor not found");
+    }
+    
+    const deletedMentor = mentorDoc.data();
+    const deletedOrder = deletedMentor.order;
+    
+    // Step 1: Soft delete the mentor
+    await updateDoc(mentorRef, {
       isActive: false,
       updatedAt: serverTimestamp(),
     });
+    
+    // Step 2: Get all active mentors with order > deletedOrder
+    const mentorsRef = collection(db, "mentors");
+    const q = query(
+      mentorsRef,
+      where("isActive", "==", true),
+      where("order", ">", deletedOrder),
+      orderBy("order", "asc")
+    );
+    const querySnapshot = await getDocs(q);
+    
+    // Step 3: Update all mentors with order > deletedOrder to decrement their order by 1
+    const updatePromises = querySnapshot.docs.map((doc) => {
+      const mentorRef = doc.ref;
+      const currentOrder = doc.data().order;
+      return updateDoc(mentorRef, {
+        order: currentOrder - 1,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+    
+    await Promise.all(updatePromises);
+    
     return { success: true };
   } catch (error) {
     console.error("Error deleting mentor:", error);
     throw new Error("Failed to delete mentor");
+  }
+};
+
+// Update mentor order
+export const updateMentorOrder = async (mentorId: string, order: number) => {
+  try {
+    const mentorRef = doc(db, "mentors", mentorId);
+    await updateDoc(mentorRef, {
+      order: order,
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating mentor order:", error);
+    throw new Error("Failed to update mentor order");
+  }
+};
+
+// Bulk update mentor orders
+export const updateMentorOrders = async (mentorOrders: { mentorId: string; order: number }[]) => {
+  try {
+    const batch = mentorOrders.map(({ mentorId, order }) => {
+      const mentorRef = doc(db, "mentors", mentorId);
+      return updateDoc(mentorRef, {
+        order: order,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+    
+    await Promise.all(batch);
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating mentor orders:", error);
+    throw new Error("Failed to update mentor orders");
   }
 };
