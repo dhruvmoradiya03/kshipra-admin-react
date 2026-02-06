@@ -1,3 +1,3 @@
-import liveSession from "@/components/liveSession";
+import manageLiveSession from "@/components/liveSession/manageLiveSession";
 
-export default liveSession;
+export default manageLiveSession

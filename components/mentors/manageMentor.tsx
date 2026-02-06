@@ -352,19 +352,19 @@ const manageMentor = () => {
                   </div>
                 ) : (
                   <div className="flex gap-2">
-                    <div className="shadow-[0px_0px_4px_0px_#10B98140] hover:shadow-[0px_2px_8px_0px_#10B98160] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-green-50 transition-all duration-300 hover:-translate-y-0.2">
-                      <SaveOutlined className="text-green-600" />
+                    <div className="shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-[#1E4640] transition-all duration-300 hover:-translate-y-0.2">
+                      <SaveOutlined className="text-white" />
                       <button
-                        className="text-green-600 font-medium"
+                        className="text-white font-medium cursor-pointer"
                         onClick={handleSaveOrder}
                         disabled={!hasChanges || loading}
                       >
                         Save Order
                       </button>
                     </div>
-                    <div className="shadow-[0px_0px_4px_0px_#EF444440] hover:shadow-[0px_2px_8px_0px_#EF444460] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-red-50 transition-all duration-300 hover:-translate-y-0.2">
+                    <div className="shadow-[0px_0px_4px_0px_#1E464040] hover:shadow-[0px_2px_8px_0px_#1E464060] px-4 gap-2 cursor-pointer rounded-xl items-center justify-center flex bg-white transition-all duration-300 hover:-translate-y-0.2">
                       <button
-                        className="text-red-600 font-medium"
+                        className="text-[#1E4640] font-medium"
                         onClick={handleCancelReorder}
                       >
                         Cancel

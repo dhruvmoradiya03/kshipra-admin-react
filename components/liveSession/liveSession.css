@@ -1,0 +1,48 @@
+/* Handle specific Ant Design focus class */
+.customInput.ant-input-focused,
+.customInput.ant-input:focus {
+    border-color: #1E4640 !important;
+    box-shadow: none !important;
+}
+
+/* Override Button styles if needed, though Tailwind usually handles buttons well, 
+   except for AntD specific states */
+.customButton:hover,
+.customButton:focus {
+  color: #1E4640 !important;
+  border-color: #1E4640 !important;
+  background-color: transparent !important;
+}
+
+.customPrimaryButton:hover,
+.customPrimaryButton:focus {
+    background-color: #163330 !important;
+    border-color: #163330 !important;
+}
+
+/* Custom Switch Styling for Thin Track */
+.customSwitch {
+    height: 14px !important;
+    line-height: 12px !important;
+    min-width: 36px !important;
+    border-radius: 20px !important;
+    overflow: visible !important; /* Allow handle to overlap track */
+    background-color: #d1d5db !important; /* Default gray-300 */
+}
+
+.customSwitch[aria-checked="true"] {
+    background-color: #1E4640 !important;
+}
+
+.customSwitch :global(.ant-switch-handle) {
+    width: 20px !important;
+    height: 20px !important;
+    top: 50% !important;
+    margin-top: -10px !important; /* Perfect vertical centering: -1/2 of height */
+    inset-inline-start: -2px !important; /* Symmetric overhang on left */
+}
+
+/* When checked, adjust handle position */
+.customSwitch[aria-checked="true"] :global(.ant-switch-handle) {
+    inset-inline-start: calc(100% - 18px) !important; /* Symmetric overhang on right */
+}
