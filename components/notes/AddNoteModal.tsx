@@ -14,6 +14,7 @@ import {
 import { UploadOutlined } from "@ant-design/icons";
 import { Subject, Topic } from "./types";
 import { Work_Sans } from "next/font/google";
+import Image from "next/image";
 import { getTopics, handleUpload, createTopic } from "@/service/api/config.api";
 
 const worksans = Work_Sans({ weight: ["400", "500", "600", "700"] });
@@ -352,7 +353,13 @@ const AddNoteModal: React.FC<AddNoteModalProps> = ({
               }}
             >
               <p className="ant-upload-drag-icon">
-                <UploadOutlined style={{ fontSize: 48, color: "#1E4640" }} />
+                <Image
+                  src="/images/upload-button.svg"
+                  alt="Upload PDF"
+                  width={48}
+                  height={48}
+                  className="mx-auto"
+                />
               </p>
               <p className="ant-upload-text" style={{ color: "#1E4640", fontWeight: 500 }}>
                 Click or drag PDF file to this area to upload
